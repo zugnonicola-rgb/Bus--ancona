@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Bus Ancona</title>
+<style>
+:root{--bg:#eef2f4;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d3dde2;--acc:#0e6e7e;--on:#fff;--warn:#8a5200;--warnbg:#fff1d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}}
+:root[data-theme="dark"]{--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Bahnschift,"Segoe UI",system-ui,sans-serif}
+main{max-width:520px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0 0 4px}
+.nota{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:14px;margin:8px 0 14px}
+nav{display:flex;gap:6px;margin-bottom:12px}
+nav button{flex:1;padding:10px 4px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font:inherit;font-weight:600}
+nav button[aria-pressed=true]{background:var(--acc);color:var(--on);border-color:var(--acc)}
+label{display:block;font-size:14px;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
+.id{display:inline-block;background:var(--acc);color:var(--on);font-weight:700;border-radius:6px;padding:1px 8px;margin-right:6px}
+.dir,.mute{color:var(--mute);font-size:14px}
+.ore{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:8px}
+.t{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px}
+.w{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:7px 9px;margin:8px 0 0;font-size:14px}
+a{color:var(--acc);font-weight:600}
+dialog{border:0;border-radius:12px;padding:16px;max-width:92vw;width:440px;background:var(--card);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.55)}
+dialog button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--acc);color:var(--on);font:inherit;font-weight:700}
+</style>
+</head>
+<body>
+<main>
+<h1>Bus Ancona</h1>
+<div class="nota">Dati di esempio (festivo, solo alcune corse del 2024). Orari di tabella, non in tempo reale.</div>
+<nav id="tabs"></nav>
+<label for="ora">Da che ora</label>
+<input id="ora" type="time" value="08:00">
+<div id="vista"></div>
+</main>
+
+<dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
+
+<script>
+const DATA={
+avvisi:[
+{titolo:"Esempio: linea 1/4 deviata per lavori in via Torresi",linee:["1/4"],link:"https://www.conerobus.it/articoli/"},
+{titolo:"Esempio: sciopero del personale, corse non garantite",linee:["*"],link:"https://www.conerobus.it/articoli/"}],
+linee:[
+{id:"1/4",dir:"Passetto → Tavernelle",f:[
+["Piazza IV Novembre - Passetto",["07.30","08.00","08.30","09.00","09.35","10.10"]],
+["Piazza Cavour",["07.35","08.05","08.35","09.05","09.40","10.15"]],
+["Piazza Roma",["07.37","08.07","08.37","09.07","09.42","10.17"]],
+["Piazza Kennedy - Porto",["07.39","08.09","08.39","09.09","09.44","10.19"]],
+["Via Marconi - Parcheggio Archi",["07.43","08.13","08.43","09.13","09.48","10.23"]],
+["Stazione FS Centrale",["07.45","08.15","08.45","09.15","09.50","10.25"]],
+["Piazza Ugo Bassi",["07.49","08.19","08.49","09.19","09.54","10.29"]],
+["Via Tavernelle",["07.54","08.24","08.54","09.24","09.59","10.34"]],
+["Tavernelle Capolinea",["07.59","08.29","08.59","09.29","10.04","10.39"]]]},
+{id:"30",dir:"Piazza Ugo Bassi → Ospedale Regionale",f:[
+["Piazza Ugo Bassi",["05.40","07.45","09.25","11.05","12.45","13.40"]],
+["Stazione FS Centrale",["05.44","07.49","09.29","11.09","12.49","13.44"]],
+["Torrette - Stazione FS",[null,"07.54","09.34","11.14","12.54","13.49"]],
+["Ospedale Regionale",["05.51","08.00","09.40","11.20","13.00","13.55"]]]}
+]};
+
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mins=t=>{const[a,b]=t.split(".");return +a*60+ +b};
+const dalle=()=>{const[a,b]=($("#ora").value||"00:00").split(":");return +a*60+ +b};
+const has=(n,q)=>n.toLowerCase().includes(q.trim().toLowerCase());
+const dopo=(tt,n)=>tt.map((t,i)=>[t,i]).filter(([t])=>t&&mins(t)>=dalle()).slice(0,n);
+const ore=l=>l.length?`<div class="ore">${l.map(t=>`<span class="t">${t}</span>`).join("")}</div>`:`<p class="mute">Nessuna corsa dopo quell'ora nei dati.</p>`;
+const head=l=>`<span class="id">${esc(l.id)}</span><span class="dir">${esc(l.dir)}</span>`;
+function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
+ return a.map(x=>`<p class="w">Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
+const nomi=[...new Set(DATA.linee.flatMap(l=>l.f.map(s=>s[0])))].sort();
+const lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`;
+let tab="fermata";
+const TABS={fermata:"Fermata",linea:"Linea",ab:"Da A a B"};
+
+function vFermata(){
+ $("#vista").innerHTML=`<label for="q">Nome fermata</label><input id="q" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off">${lista}<div id="r"></div>`;
+ const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
+  let h="";DATA.linee.forEach(l=>l.f.forEach(s=>{if(has(s[0],q))h+=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],4).map(x=>x[0]))}${warn(l)}</div>`}));
+  $("#r").innerHTML=h||'<p class="mute">Nessuna fermata trovata nei dati di esempio.</p>'};
+ $("#q").oninput=go;go();
+}
+function vLinea(){
+ $("#vista").innerHTML=`<label for="sl">Linea e direzione</label><select id="sl">${DATA.linee.map((l,i)=>`<option value="${i}">${esc(l.id)} · ${esc(l.dir)}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><div id="r"></div>`;
+ const fill=()=>{const l=DATA.linee[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
+ const show=()=>{const l=DATA.linee[$("#sl").value],s=l.f[$("#sf").value];
+  $("#r").innerHTML=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],6).map(x=>x[0]))}${warn(l)}</div>`};
+ $("#sl").onchange=fill;$("#sf").onchange=show;fill();
+}
+function vAB(){
+ $("#vista").innerHTML=`<label for="da">Partenza</label><input id="da" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off"><label for="a">Arrivo</label><input id="a" list="fermate" placeholder="Es. Stazione FS" autocomplete="off">${lista}<div id="r"></div>`;
+ const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML='<p class="mute">Scegli partenza e arrivo. Solo bus diretti, senza cambi.</p>';return}
+  let h="";DATA.linee.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
+   const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,3);
+   h+=`<div class="card">${head(l)}<div class="mute">${esc(l.f[i][0])} → ${esc(l.f[j][0])}</div>${tr.length?tr.map(([p,r])=>`<div class="ore"><span class="t">${p}</span><span class="mute" style="align-self:center">arrivo ${r} · ${mins(r)-mins(p)} min</span></div>`).join(""):'<p class="mute">Nessuna corsa dopo quell\'ora nei dati.</p>'}${warn(l)}</div>`});
+  $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato nei dati di esempio.</p>'};
+ $("#da").oninput=go;$("#a").oninput=go;go();
+}
+function vista(){$("#tabs").innerHTML=Object.keys(TABS).map(k=>`<button data-k="${k}" aria-pressed="${k===tab}">${TABS[k]}</button>`).join("");
+ document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.k;vista()});
+ ({fermata:vFermata,linea:vLinea,ab:vAB})[tab]()}
+$("#ora").onchange=vista;
+
+$("#avv").innerHTML=DATA.avvisi.map(x=>`<div class="card"><strong>${esc(x.titolo)}</strong><div class="mute">${x.linee.includes("*")?"Tutte le linee":"Linea "+x.linee.map(esc).join(", ")}</div><a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></div>`).join("");
+$("#ok").onclick=()=>$("#pop").close();
+vista();
+if(DATA.avvisi.length)$("#pop").showModal();
+</script>
+</body>
+</html>

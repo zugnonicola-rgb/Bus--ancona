@@ -1,0 +1,134 @@
+Aggiornato: 2026-10-01 07:34 UTC | linee: 309 | avvisi: 3
+urbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/AnconaFerialeInvernalescolastico21092026-1.pdf
+  ! linea 3: dati insufficienti
+  ! linea C.D.: dati insufficienti
+  ! linea C.S.: dati insufficienti
+  ! linea 11: dati insufficienti
+  ! linea 1/3: dati insufficienti
+  ! linea 21: dati insufficienti
+  ! linea 22: dati insufficienti
+  ! linea 22: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 24: dati insufficienti
+  ! linea 24: dati insufficienti
+  ! linea 3: dati insufficienti
+  ! linea 7: dati insufficienti
+  ! linea 8: dati insufficienti
+  ! linea 89: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea 1/4: 27 corse con orari non crescenti (controllare)
+  ! linea 2: 1 corse con orari non crescenti (controllare)
+  ! linea 24: 3 corse con orari non crescenti (controllare)
+  ! linea 30: 3 corse con orari non crescenti (controllare)
+  linee/direzioni lette: 53
+extraurbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/extraurbanoconeroferialescolastico14_09_2026.pdf
+  ! linea N: dati insufficienti
+  ! linea A: dati insufficienti
+  ! linea H: dati insufficienti
+  ! linea H: dati insufficienti
+  ! linea I: dati insufficienti
+  ! linea I: dati insufficienti
+  ! linea JEX1: dati insufficienti
+  ! linea L: dati insufficienti
+  ! linea L: dati insufficienti
+  ! linea M: dati insufficienti
+  ! linea M: dati insufficienti
+  ! linea B: 9 corse con orari non crescenti (controllare)
+  ! linea B: 2 corse con orari non crescenti (controllare)
+  ! linea N: 3 corse con orari non crescenti (controllare)
+  ! linea N: 3 corse con orari non crescenti (controllare)
+  ! linea Q: 11 corse con orari non crescenti (controllare)
+  ! linea R: 2 corse con orari non crescenti (controllare)
+  ! linea R: 5 corse con orari non crescenti (controllare)
+  ! linea R/ e 24: 8 corse con orari non crescenti (controllare)
+  ! linea R/ e 24: 4 corse con orari non crescenti (controllare)
+  linee/direzioni lette: 37
+urbano | Feriale estivo | https://www.conerobus.it/wp-content/uploads/2026/08/AnconaFerialeEstivogiugnosettembre2026_08_13.pdf
+  ! linea 30: dati insufficienti
+  ! linea 10: dati insufficienti
+  ! linea 21: dati insufficienti
+  ! linea 24: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 3: dati insufficienti
+  ! linea 3: dati insufficienti
+  ! linea 30: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea C.D.: dati insufficienti
+  ! linea C.S.: dati insufficienti
+  ! linea 24: 2 corse con orari non crescenti (controllare)
+  ! linea 46: 10 corse con orari non crescenti (controllare)
+  linee/direzioni lette: 55
+urbano | Feriale invernale | https://www.conerobus.it/wp-content/uploads/2026/08/AnconaFerragosto_11082026.pdf
+  ! linea 36: dati insufficienti
+  ! linea 36: dati insufficienti
+  linee/direzioni lette: 32
+urbano | Festivo invernale | https://www.conerobus.it/wp-content/uploads/2026/06/ancona_festivoinvernale_2026_09_14.pdf
+  ! linea 31: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/5: dati insufficienti
+  ! linea 1/5: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 21/33: dati insufficienti
+  ! linea 21/33: dati insufficienti
+  ! linea 22: dati insufficienti
+  ! linea R/ e 24: dati insufficienti
+  ! linea R/ e 24: dati insufficienti
+  ! linea 22: dati insufficienti
+  ! linea 30: dati insufficienti
+  ! linea 30: dati insufficienti
+  ! linea 31: dati insufficienti
+  linee/direzioni lette: 38
+urbano | Feriale invernale (vacanze) | https://www.conerobus.it/wp-content/uploads/2026/06/AnconaFerialeVacanze-Scolastico-17_06_2026.pdf
+  ! linea 30: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/3: dati insufficienti
+  ! linea 11: dati insufficienti
+  ! linea 12: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 21: dati insufficienti
+  ! linea 22: dati insufficienti
+  ! linea 24: dati insufficienti
+  ! linea 24: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 2/6: dati insufficienti
+  ! linea 3: dati insufficienti
+  ! linea 3: dati insufficienti
+  ! linea 30: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 91: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 92: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea 93: dati insufficienti
+  ! linea C.S.: dati insufficienti
+  ! linea C.D.: dati insufficienti
+  ! linea 24: 2 corse con orari non crescenti (controllare)
+  linee/direzioni lette: 51
+urbano | Festivo estivo | https://www.conerobus.it/wp-content/uploads/2026/06/AnconaFestivoEstivo2026_06_28.pdf
+  ! linea 31: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/4: dati insufficienti
+  ! linea 1/3: dati insufficienti
+  ! linea 1/3: dati insufficienti
+  ! linea 1/5: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 2: dati insufficienti
+  ! linea 94: dati insufficienti
+  ! linea 94: dati insufficienti
+  linee/direzioni lette: 43

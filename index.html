@@ -33,8 +33,10 @@ dialog button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px
 <body>
 <main>
 <h1>Bus Ancona</h1>
-<div class="nota">Dati di esempio (festivo, solo alcune corse del 2024). Orari di tabella, non in tempo reale.</div>
+<div class="nota" id="nota"></div>
 <nav id="tabs"></nav>
+<label for="per">Tipo di orario</label>
+<select id="per"></select>
 <label for="ora">Da che ora</label>
 <input id="ora" type="time" value="08:00">
 <div id="vista"></div>
@@ -43,7 +45,8 @@ dialog button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
 
 <script>
-const DATA={
+let SAMPLE=true,GEN="",ATT=[];
+let DATA={
 avvisi:[
 {titolo:"Esempio: linea 1/4 deviata per lavori in via Torresi",linee:["1/4"],link:"https://www.conerobus.it/articoli/"},
 {titolo:"Esempio: sciopero del personale, corse non garantite",linee:["*"],link:"https://www.conerobus.it/articoli/"}],
@@ -75,29 +78,29 @@ const ore=l=>l.length?`<div class="ore">${l.map(t=>`<span class="t">${t}</span>`
 const head=l=>`<span class="id">${esc(l.id)}</span><span class="dir">${esc(l.dir)}</span>`;
 function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
  return a.map(x=>`<p class="w">Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
-const nomi=[...new Set(DATA.linee.flatMap(l=>l.f.map(s=>s[0])))].sort();
-const lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`;
+let nomi=[],lista="";
+function prepara(){nomi=[...new Set(ATT.flatMap(l=>l.f.map(s=>s[0])))].sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 let tab="fermata";
 const TABS={fermata:"Fermata",linea:"Linea",ab:"Da A a B"};
 
 function vFermata(){
  $("#vista").innerHTML=`<label for="q">Nome fermata</label><input id="q" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off">${lista}<div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
-  let h="";DATA.linee.forEach(l=>l.f.forEach(s=>{if(has(s[0],q))h+=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],4).map(x=>x[0]))}${warn(l)}</div>`}));
+  let h="";ATT.forEach(l=>l.f.forEach(s=>{if(has(s[0],q))h+=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],4).map(x=>x[0]))}${warn(l)}</div>`}));
   $("#r").innerHTML=h||'<p class="mute">Nessuna fermata trovata nei dati di esempio.</p>'};
  $("#q").oninput=go;go();
 }
 function vLinea(){
- $("#vista").innerHTML=`<label for="sl">Linea e direzione</label><select id="sl">${DATA.linee.map((l,i)=>`<option value="${i}">${esc(l.id)} · ${esc(l.dir)}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><div id="r"></div>`;
- const fill=()=>{const l=DATA.linee[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
- const show=()=>{const l=DATA.linee[$("#sl").value],s=l.f[$("#sf").value];
+ $("#vista").innerHTML=`<label for="sl">Linea e direzione</label><select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · ${esc(l.dir)}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><div id="r"></div>`;
+ const fill=()=>{const l=ATT[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
+ const show=()=>{const l=ATT[$("#sl").value],s=l.f[$("#sf").value];
   $("#r").innerHTML=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],6).map(x=>x[0]))}${warn(l)}</div>`};
  $("#sl").onchange=fill;$("#sf").onchange=show;fill();
 }
 function vAB(){
  $("#vista").innerHTML=`<label for="da">Partenza</label><input id="da" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off"><label for="a">Arrivo</label><input id="a" list="fermate" placeholder="Es. Stazione FS" autocomplete="off">${lista}<div id="r"></div>`;
  const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML='<p class="mute">Scegli partenza e arrivo. Solo bus diretti, senza cambi.</p>';return}
-  let h="";DATA.linee.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
+  let h="";ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
    const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,3);
    h+=`<div class="card">${head(l)}<div class="mute">${esc(l.f[i][0])} → ${esc(l.f[j][0])}</div>${tr.length?tr.map(([p,r])=>`<div class="ore"><span class="t">${p}</span><span class="mute" style="align-self:center">arrivo ${r} · ${mins(r)-mins(p)} min</span></div>`).join(""):'<p class="mute">Nessuna corsa dopo quell\'ora nei dati.</p>'}${warn(l)}</div>`});
   $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato nei dati di esempio.</p>'};
@@ -107,11 +110,25 @@ function vista(){$("#tabs").innerHTML=Object.keys(TABS).map(k=>`<button data-k="
  document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.k;vista()});
  ({fermata:vFermata,linea:vLinea,ab:vAB})[tab]()}
 $("#ora").onchange=vista;
-
-$("#avv").innerHTML=DATA.avvisi.map(x=>`<div class="card"><strong>${esc(x.titolo)}</strong><div class="mute">${x.linee.includes("*")?"Tutte le linee":"Linea "+x.linee.map(esc).join(", ")}</div><a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></div>`).join("");
-$("#ok").onclick=()=>$("#pop").close();
-vista();
-if(DATA.avvisi.length)$("#pop").showModal();
+function indovina(tipi){const d=new Date(),m=d.getMonth()+1,g=d.getDate();
+ const est=(m>6&&m<9)||(m===6&&g>=8)||(m===9&&g<=14);
+ const w=(d.getDay()===0?"Festivo":"Feriale")+" "+(est?"estivo":"invernale");
+ return tipi.find(t=>t.startsWith(w))||tipi.find(t=>t.startsWith(w.split(" ")[0]))||tipi[0]}
+function applica(){const t=$("#per").value;ATT=DATA.linee.filter(l=>l.tipo===t);prepara();vista()}
+function popup(){if(!DATA.avvisi.length)return;
+ $("#avv").innerHTML=DATA.avvisi.map(x=>`<div class="card"><strong>${esc(x.titolo)}</strong><div class="mute">${x.linee.includes("*")?"Tutte le linee":x.linee.length?"Linea "+x.linee.map(esc).join(", "):"Zona delle tue linee"}</div><a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></div>`).join("");
+ $("#pop").showModal()}
+async function carica(){
+ try{const r=await fetch("data.json",{cache:"no-cache"});if(r.ok){const d=await r.json();if(d.linee&&d.linee.length){DATA.linee=d.linee;SAMPLE=false;GEN=d.generato}}}catch(e){}
+ if(SAMPLE){DATA.linee.forEach(l=>l.tipo="Festivo invernale (esempio)");$("#nota").textContent="Dati di esempio (festivo, solo alcune corse del 2024). Orari di tabella, non in tempo reale."}
+ else{try{const r=await fetch("avvisi.json",{cache:"no-cache"});DATA.avvisi=r.ok?(await r.json()).avvisi||[]:[]}catch(e){DATA.avvisi=[]}
+  const n=new Date();$("#ora").value=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  $("#nota").innerHTML="Orari di tabella aggiornati il "+esc(GEN)+". Non in tempo reale. <a href=\"report.txt\">Stato dati</a>"}
+ const tipi=[...new Set(DATA.linee.map(l=>l.tipo))];
+ $("#per").innerHTML=tipi.map(t=>`<option>${esc(t)}</option>`).join("");$("#per").value=indovina(tipi);$("#per").onchange=applica;
+ $("#ok").onclick=()=>$("#pop").close();
+ applica();popup()}
+carica();
 </script>
 </body>
 </html>

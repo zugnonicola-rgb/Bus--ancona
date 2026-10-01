@@ -165,6 +165,7 @@ def motivi_rilevanza(avviso):
 import io
 from datetime import date
 
+DIAG = [0]
 TIME = re.compile(r"^\d{1,2}[.:]\d{2}$")
 OGGI = datetime.now(timezone.utc)
 
@@ -197,13 +198,17 @@ def trova_pdf():
     return sorted(trovati, key=lambda u: re.findall(r"/(\d{4})/(\d{2})/", u) or [("0", "0")], reverse=True)
 
 
-def etichetta(testo):
+def etichetta(testo, url=""):
     t = testo[:1500].upper()
     extra = "EXTRAURBANO" in t or "LIBRETTO" in t
     giorno = "festivo" if re.search(r"\bFESTIVO\b", t) else "feriale"
     stagione = "estivo" if re.search(r"\bESTIVO\b", t) else "invernale"
     scuola = "vacanze" if "VACANZE" in t else ("scuole aperte" if ("SCUOLE APERTE" in t or "SCOLASTIC" in t) else "")
     lab = giorno.capitalize() + " " + stagione + (" (%s)" % scuola if scuola else "")
+    if "ferragosto" in url.lower():
+        lab = "Ferragosto"
+    elif "ridott" in url.lower():
+        lab += " ridotto"
     return ("extraurbano" if extra else "urbano"), lab
 
 
@@ -237,7 +242,10 @@ def nuovo_blocco(testo):
 def parse_pdf(pdf):
     blocchi, cur, tab, hdr = [], None, None, False
     for page in pdf.pages:
-        for r in righe(page.extract_words(x_tolerance=1.5, y_tolerance=2)):
+        rr = righe(page.extract_words(x_tolerance=1.5, y_tolerance=2))
+        if sum("...." in " ".join(w["text"] for w in r) for r in rr) > 5:
+            continue
+        for r in rr:
             testo = " ".join(w["text"] for w in r)
             tempi = [w for w in r if TIME.match(w["text"])]
             if "...." in testo:
@@ -265,7 +273,7 @@ def parse_pdf(pdf):
                 tab = []
                 cur["tabs"].append(tab)
             tab.append((nome, [(w["x0"], w["text"]) for w in tempi]))
-    return blocchi
+    return [b for b in blocchi if b["tabs"]]
 
 
 def tabella_a_viaggi(tab):
@@ -290,24 +298,35 @@ def tabella_a_viaggi(tab):
 
 
 def blocco_a_linea(b, lab, report):
-    ordine, viaggi = [], []
+    ordine, viaggi, info = [], [], []
     for tab in b["tabs"]:
         chiavi, v = tabella_a_viaggi(tab)
+        pos = -1
         for k in chiavi:
-            if k not in ordine:
-                ordine.append(k)
+            if k in ordine:
+                pos = ordine.index(k)
+            else:
+                pos += 1
+                ordine.insert(pos, k)
+        info.append("tab %d: colonne=%d, max valori in una riga=%d, righe=%d" % (
+            len(info) + 1, len(v), max(len(r) for _, r in tab), len(tab)))
         viaggi += v
     viaggi = [v for v in viaggi if len(v) >= 2]
     if len(ordine) < 2 or not viaggi:
         report.append("  ! linea %s: dati insufficienti" % b["id"])
         return None
-    storte = 0
+    storte, esempio = 0, None
     for v in viaggi:
         seq = [mins_(v[k]) for k in ordine if k in v]
         if any(b2 < a - 5 and a - b2 < 600 for a, b2 in zip(seq, seq[1:])):
             storte += 1
+            esempio = esempio or v
     if storte:
-        report.append("  ! linea %s: %d corse con orari non crescenti (controllare)" % (b["id"], storte))
+        report.append("  ! linea %s (%s): %d/%d corse con orari non crescenti" % (b["id"], b["hdr"][:40], storte, len(viaggi)))
+        if DIAG[0] < 6:
+            DIAG[0] += 1
+            report.append("    " + " | ".join(info))
+            report.append("    esempio: " + "; ".join("%s=%s" % (k[0][:18], esempio[k]) for k in ordine if k in esempio)[:420])
     seg = [s.strip() for s in b["hdr"].split(" - ") if s.strip()]
     verso = "%s → %s" % (seg[0], seg[-1]) if len(seg) > 1 else b["hdr"]
     verso = re.sub(r"\s*\(?Orario.*$", "", verso).strip(" -")
@@ -330,7 +349,7 @@ def costruisci_orari():
                 up = testo.upper()
                 if "ANCONA" not in up or not any(x in up for x in ("SERVIZIO URBANO DI ANCONA", "EXTRAURBANO", "LIBRETTO")):
                     continue
-                ambito, lab = etichetta(testo)
+                ambito, lab = etichetta(testo, url)
                 if (ambito, lab) in visti:
                     continue
                 visti.add((ambito, lab))

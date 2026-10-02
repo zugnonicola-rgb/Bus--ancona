@@ -4,18 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bus Ancona</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <style>
 :root{--bg:#eef2f4;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d3dde2;--acc:#0e6e7e;--on:#fff;--warn:#8a5200;--warnbg:#fff1d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}}
 :root[data-theme="dark"]{--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 Bahnschift,"Segoe UI",system-ui,sans-serif}
-main{max-width:520px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:0 0 4px}
 .nota{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:8px 10px;font-size:14px;margin:8px 0 14px}
-nav{display:flex;gap:6px;margin-bottom:12px}
-nav button{flex:1;padding:10px 4px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;font:inherit;font-weight:600}
-nav button[aria-pressed=true]{background:var(--acc);color:var(--on);border-color:var(--acc)}
 label{display:block;font-size:14px;color:var(--mute);margin:10px 0 4px}
 input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--ink);font:inherit}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-top:10px}
@@ -25,27 +22,45 @@ input,select{width:100%;padding:11px;border:1px solid var(--line);border-radius:
 .t{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.5px}
 .w{background:var(--warnbg);color:var(--warn);border-radius:8px;padding:7px 9px;margin:8px 0 0;font-size:14px}
 a{color:var(--acc);font-weight:600}
+.btn{margin-top:10px;width:100%;padding:10px;border:1px solid var(--acc);background:transparent;color:var(--acc);border-radius:8px;font:inherit;font-weight:600}
 dialog{border:0;border-radius:12px;padding:16px;max-width:92vw;width:440px;background:var(--card);color:var(--ink)}
 dialog::backdrop{background:rgba(0,0,0,.55)}
 dialog button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--acc);color:var(--on);font:inherit;font-weight:700}
+
+html,body{height:100%;overflow:hidden}
+#map{position:fixed;left:0;right:0;top:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--bg)}
+#bar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:1000}
+#bar button{flex:1;border:0;background:none;color:var(--mute);font:inherit;font-size:12px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
+#bar button[aria-pressed=true]{color:var(--acc);font-weight:700}
+#bar i{font-style:normal;font-size:20px}
+#sheet{position:fixed;left:0;right:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));max-height:58vh;overflow:auto;background:var(--bg);border-radius:16px 16px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.3);padding:12px 16px 16px;z-index:999}
+#sheet[hidden],#chip[hidden],#imp[hidden],#vista[hidden]{display:none}
+.sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+#chiudi{border:0;background:none;color:var(--ink);font-size:22px;padding:4px 8px}
+#chip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;z-index:900;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#chip button{margin-left:auto;border:0;background:none;color:var(--ink);font-size:18px}
 </style>
 </head>
 <body>
-<main>
-<h1>Bus Ancona</h1>
-<div class="nota" id="nota"></div>
-<nav id="tabs"></nav>
-<label for="per">Tipo di orario</label>
-<select id="per"></select>
-<label for="ora">Da che ora</label>
-<input id="ora" type="time" value="08:00">
+<div id="map"></div>
+<div id="chip" hidden></div>
+<nav id="bar">
+<button data-k="vicino"><i>📍</i>Vicino</button>
+<button data-k="fermata"><i>🚏</i>Fermata</button>
+<button data-k="linea"><i>🚌</i>Linea</button>
+<button data-k="ab"><i>↔️</i>Da A a B</button>
+<button data-k="imp"><i>🕐</i>Orario</button>
+</nav>
+<section id="sheet" hidden>
+<div class="sh"><strong id="stit"></strong><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-</main>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"></div>
+</section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
 
 <script>
-let SAMPLE=true,GEN="",ATT=[];
+let SAMPLE=true,GEN="",ATT=[],COORD={},MAP=null,mapLine="";
 let DATA={
 avvisi:[
 {titolo:"Esempio: linea 1/4 deviata per lavori in via Torresi",linee:["1/4"],link:"https://www.conerobus.it/articoli/"},
@@ -79,10 +94,10 @@ const head=l=>`<span class="id">${esc(l.id)}</span><span class="dir">${esc(l.dir
 function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
  return a.map(x=>`<p class="w">Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
 let nomi=[],lista="";
-function prepara(){nomi=[...new Set(ATT.flatMap(l=>l.f.map(s=>s[0])))].sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
-let tab="fermata";
-const TABS={fermata:"Fermata",linea:"Linea",ab:"Da A a B"};
-
+let IDX={};
+function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1]])));nomi=[...new Set(ATT.flatMap(l=>l.f.map(s=>s[0])))].sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
+let tab="",LAY=null,USER=null;
+const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario"};
 function vFermata(){
  $("#vista").innerHTML=`<label for="q">Nome fermata</label><input id="q" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off">${lista}<div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
@@ -94,7 +109,7 @@ function vLinea(){
  $("#vista").innerHTML=`<label for="sl">Linea e direzione</label><select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · ${esc(l.dir)}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><div id="r"></div>`;
  const fill=()=>{const l=ATT[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
  const show=()=>{const l=ATT[$("#sl").value],s=l.f[$("#sf").value];
-  $("#r").innerHTML=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],6).map(x=>x[0]))}${warn(l)}</div>`};
+  $("#r").innerHTML=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],6).map(x=>x[0]))}${warn(l)}${mapBtn(l)}</div>`};
  $("#sl").onchange=fill;$("#sf").onchange=show;fill();
 }
 function vAB(){
@@ -102,24 +117,66 @@ function vAB(){
  const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML='<p class="mute">Scegli partenza e arrivo. Solo bus diretti, senza cambi.</p>';return}
   let h="";ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
    const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,3);
-   h+=`<div class="card">${head(l)}<div class="mute">${esc(l.f[i][0])} → ${esc(l.f[j][0])}</div>${tr.length?tr.map(([p,r])=>`<div class="ore"><span class="t">${p}</span><span class="mute" style="align-self:center">arrivo ${r} · ${mins(r)-mins(p)} min</span></div>`).join(""):'<p class="mute">Nessuna corsa dopo quell\'ora nei dati.</p>'}${warn(l)}</div>`});
+   h+=`<div class="card">${head(l)}<div class="mute">${esc(l.f[i][0])} → ${esc(l.f[j][0])}</div>${tr.length?tr.map(([p,r])=>`<div class="ore"><span class="t">${p}</span><span class="mute" style="align-self:center">arrivo ${r} · ${mins(r)-mins(p)} min</span></div>`).join(""):'<p class="mute">Nessuna corsa dopo quell\'ora nei dati.</p>'}${warn(l)}${mapBtn(l)}</div>`});
   $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato nei dati di esempio.</p>'};
  $("#da").oninput=go;$("#a").oninput=go;go();
 }
-function vista(){$("#tabs").innerHTML=Object.keys(TABS).map(k=>`<button data-k="${k}" aria-pressed="${k===tab}">${TABS[k]}</button>`).join("");
- document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{tab=b.dataset.k;vista()});
- ({fermata:vFermata,linea:vLinea,ab:vAB})[tab]()}
+function render(){
+ $("#sheet").hidden=!tab;
+ document.querySelectorAll("#bar button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===tab));
+ if(!tab)return;
+ $("#stit").textContent=TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
+ if(tab==="imp")return;
+ ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino})[tab]()}
+function vista(){render()}
 $("#ora").onchange=vista;
+const mapBtn=l=>COORD&&Object.keys(COORD).length?`<button class="btn" data-map="${ATT.indexOf(l)}">Vedi sulla mappa</button>`:"";
+const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+function popStop(n){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,3).map(x=>x[0])]).filter(x=>x[1].length).sort((a,b)=>mins(a[1][0])-mins(b[1][0]));
+ return `<strong>${esc(n)}</strong>`+(r.slice(0,6).map(([l,t])=>`<div><b>${esc(l.id)}</b> <span class="mute">${esc(l.dir.split(" → ").pop())}</span><br>${t.join(" · ")}${DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*"))?" ⚠":""}</div>`).join("")||'<div class="mute">Nessuna corsa dopo quell\'ora</div>')+(r.length>6?`<div class="mute">+${r.length-6} altre linee</div>`:"")}
+function initMap(){
+ if(!window.L){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
+ MAP=L.map("map",{zoomControl:false}).setView([43.6158,13.5189],13);
+ L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap"}).addTo(MAP);
+ L.control.zoom({position:"topright"}).addTo(MAP);LAY=L.layerGroup().addTo(MAP)}
+function punto(n,ev){const c=COORD[n];if(!c)return;
+ L.circleMarker(c,{radius:ev?7:4,color:ev?"#0e6e7e":"#6b7f88",weight:1,fillOpacity:ev?.95:.5,fillColor:ev?"#0e6e7e":"#6b7f88"}).addTo(LAY).bindPopup(()=>popStop(n))}
+function drawMap(){
+ if(!MAP)return;LAY.clearLayers();const chip=$("#chip");
+ if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';return}
+ if(mapLine===""){chip.hidden=true;Object.keys(IDX).forEach(n=>punto(n,false));return}
+ const l=ATT[mapLine],pts=l.f.map(x=>COORD[x[0]]).filter(Boolean);
+ const pl=L.polyline(pts,{color:"#0e6e7e",weight:4}).addTo(LAY);l.f.forEach(x=>punto(x[0],true));
+ if(pts.length)MAP.fitBounds(pl.getBounds(),{padding:[30,30]});
+ const m=l.f.filter(x=>!COORD[x[0]]).length;
+ chip.hidden=false;chip.innerHTML=`<span class="id">${esc(l.id)}</span><span>${esc(l.dir)}${m?` <span class="mute">(${m} fermate senza posizione)</span>`:""}</span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
+ $("#x").onclick=()=>{mapLine="";drawMap()}}
+function vVicino(){
+ $("#vista").innerHTML='<p class="mute" id="r">Cerco la tua posizione…</p>';
+ const err=t=>{$("#r").textContent=t};
+ if(!Object.keys(COORD).length)return err("Le posizioni delle fermate non sono ancora pronte.");
+ if(!navigator.geolocation)return err("Posizione non disponibile su questo dispositivo.");
+ navigator.geolocation.getCurrentPosition(p=>{const a=p.coords.latitude,b=p.coords.longitude;
+  if(MAP){if(USER)MAP.removeLayer(USER);USER=L.circleMarker([a,b],{radius:8,color:"#fff",weight:2,fillColor:"#1a73e8",fillOpacity:1}).addTo(MAP);
+   MAP.setView([a,b],16,{animate:false});MAP.panBy([0,Math.round(innerHeight*.18)],{animate:false})}
+  const v=Object.keys(IDX).filter(n=>COORD[n]).map(n=>[n,dist(a,b,COORD[n][0],COORD[n][1])]).sort((x,y)=>x[1]-y[1]).slice(0,4);
+  $("#vista").innerHTML=v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div>${popStop(n)}</div>`).join("")},
+  ()=>err("Non riesco a ottenere la posizione: controlla i permessi del browser."),{enableHighAccuracy:true,timeout:15000})}
+$("#vista").addEventListener("click",e=>{const b=e.target.closest("[data-map]");if(b){mapLine=b.dataset.map;tab="";render();drawMap()}});
+document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
+$("#chiudi").onclick=()=>{tab="";render()};
+
 function indovina(tipi){const d=new Date(),m=d.getMonth()+1,g=d.getDate();
  const est=(m>6&&m<9)||(m===6&&g>=8)||(m===9&&g<=14);
  const w=(d.getDay()===0?"Festivo":"Feriale")+" "+(est?"estivo":"invernale");
  return tipi.find(t=>t.startsWith(w))||tipi.find(t=>t.startsWith(w.split(" ")[0]))||tipi[0]}
-function applica(){const t=$("#per").value;ATT=DATA.linee.filter(l=>l.tipo===t);prepara();vista()}
+function applica(){const t=$("#per").value;ATT=DATA.linee.filter(l=>l.tipo===t);prepara();drawMap();render()}
 function popup(){if(!DATA.avvisi.length)return;
  $("#avv").innerHTML=DATA.avvisi.map(x=>`<div class="card"><strong>${esc(x.titolo)}</strong><div class="mute">${x.linee.includes("*")?"Tutte le linee":x.linee.length?"Linea "+x.linee.map(esc).join(", "):"Zona delle tue linee"}</div><a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></div>`).join("");
  $("#pop").showModal()}
 async function carica(){
- try{const r=await fetch("data.json",{cache:"no-cache"});if(r.ok){const d=await r.json();if(d.linee&&d.linee.length){DATA.linee=d.linee;SAMPLE=false;GEN=d.generato}}}catch(e){}
+ initMap();
+ try{const r=await fetch("data.json",{cache:"no-cache"});if(r.ok){const d=await r.json();if(d.linee&&d.linee.length){DATA.linee=d.linee;SAMPLE=false;GEN=d.generato;COORD=Object.fromEntries(Object.entries(d.fermate||{}).filter(e=>e[1]))}}}catch(e){}
  if(SAMPLE){DATA.linee.forEach(l=>l.tipo="Festivo invernale (esempio)");$("#nota").textContent="Dati di esempio (festivo, solo alcune corse del 2024). Orari di tabella, non in tempo reale."}
  else{try{const r=await fetch("avvisi.json",{cache:"no-cache"});DATA.avvisi=r.ok?(await r.json()).avvisi||[]:[]}catch(e){DATA.avvisi=[]}
   const n=new Date();$("#ora").value=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");

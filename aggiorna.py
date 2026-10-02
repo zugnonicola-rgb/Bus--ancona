@@ -368,6 +368,89 @@ def costruisci_orari():
     return {"generato": OGGI.strftime("%Y-%m-%d %H:%M UTC"), "fonti": fonti, "linee": linee}, report
 
 
+# ====================== POSIZIONE DELLE FERMATE (approssimata) ======================
+import math
+import time
+
+MAX_CHIAMATE = 600
+CENTRO = (43.6158, 13.5189)
+VIEWBOX = "13.0,43.85,13.9,43.35"
+SIGLE = {"P.le": "Piazzale", "P.zza": "Piazza", "P.za": "Piazza", "C.so": "Corso", "V.le": "Viale",
+         "S.S.": "Strada Statale", "St. Vecchia": "Strada Vecchia", "Str.": "Strada", "Ist.": "Istituto",
+         "SP ": "Strada Provinciale ", "Scamb.re": "Scambiatore", "Sc.": "Scuola"}
+
+
+def km(lat1, lon1, lat2, lon2):
+    p = math.pi / 180
+    a = math.sin((lat2 - lat1) * p / 2) ** 2 + math.cos(lat1 * p) * math.cos(lat2 * p) * math.sin((lon2 - lon1) * p / 2) ** 2
+    return 12742 * math.asin(math.sqrt(a))
+
+
+def pulisci_nome(n):
+    n = re.sub(r"\bCapolinea\b", "", n)
+    for a, b in SIGLE.items():
+        n = n.replace(a, b)
+    return re.sub(r"\s+", " ", n).strip(" -")
+
+
+def geocodifica(nome, chiamate):
+    parti = [pulisci_nome(x) for x in re.split(r"\s+-\s+", nome) if x.strip()]
+    cand = []
+    for c in [pulisci_nome(nome)] + parti[:1] + parti[-1:]:
+        if c and c not in cand:
+            cand.append(c)
+    for c in cand:
+        chiamate[0] += 1
+        time.sleep(1.1)
+        url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
+            {"q": c + ", Ancona", "format": "jsonv2", "limit": 5, "viewbox": VIEWBOX, "bounded": 1, "countrycodes": "it"})
+        req = urllib.request.Request(url, headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            res = json.loads(r.read().decode("utf-8"))
+        best = None
+        for x in res:
+            lat, lon = float(x["lat"]), float(x["lon"])
+            d = km(lat, lon, *CENTRO)
+            if d <= 45 and (best is None or d < best[0]):
+                best = (d, lat, lon)
+        if best:
+            return [round(best[1], 5), round(best[2], 5)]
+    return None
+
+
+def aggiorna_fermate(dati, report):
+    prec, manuali = {}, {}
+    for nome_file, dest in (("data.json", "prec"), ("fermate_manuali.json", "man")):
+        try:
+            d = json.load(open(nome_file, encoding="utf-8"))
+            if dest == "prec":
+                prec = d.get("fermate", {})
+            else:
+                manuali = d
+        except Exception:
+            pass
+    nomi = sorted({st[0] for l in dati["linee"] for st in l["f"]})
+    coord = {n: prec[n] for n in nomi if n in prec}
+    chiamate, nuove, trovate, errori = [0], 0, 0, 0
+    for n in nomi:
+        if n in manuali:
+            coord[n] = manuali[n]
+            continue
+        if n in coord or chiamate[0] >= MAX_CHIAMATE or errori >= 5:
+            continue
+        try:
+            coord[n] = geocodifica(n, chiamate)
+        except Exception as e:
+            errori += 1
+            report.append("  geocodifica non riuscita per '%s': %s" % (n, e))
+            continue
+        nuove += 1
+        trovate += 1 if coord[n] else 0
+    ok = sum(1 for n in nomi if coord.get(n))
+    report.append("Fermate con posizione: %d/%d (cercate ora: %d, trovate: %d)" % (ok, len(nomi), nuove, trovate))
+    dati["fermate"] = {n: coord[n] for n in nomi if n in coord}
+
+
 # ====================== AVVISI ======================
 def costruisci_avvisi(report):
     av = []
@@ -398,6 +481,7 @@ if __name__ == "__main__":
     dati, report = costruisci_orari()
     avvisi = costruisci_avvisi(report)
     if dati["linee"]:
+        aggiorna_fermate(dati, report)
         json.dump(dati, open("data.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     else:
         report.append("ATTENZIONE: nessun orario letto, data.json non aggiornato")

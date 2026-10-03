@@ -1,5 +1,5 @@
-Aggiornato: 2026-10-02 08:05 UTC | linee: 359 | avvisi: 4
-urbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/AnconaFerialeInvernalescolastico21092026-1.pdf
+Aggiornato: 2026-10-03 04:25 UTC | linee: 359 | avvisi: 5
+urbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/10/AnconaFerialeInvernalescolastico1102026.pdf
   linee/direzioni lette: 53
 extraurbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/extraurbanoconeroferialescolastico14_09_2026.pdf
   ! linea Q (Filottrano - Osimo - Ancona): 11/21 corse con orari non crescenti
@@ -33,4 +33,4 @@ urbano | Feriale invernale (vacanze) | https://www.conerobus.it/wp-content/uploa
   linee/direzioni lette: 51
 urbano | Festivo estivo | https://www.conerobus.it/wp-content/uploads/2026/06/AnconaFestivoEstivo2026_06_28.pdf
   linee/direzioni lette: 43
-Fermate con posizione: 385/482 (cercate ora: 0, trovate: 0)
+Fermate con posizione: 387/483 (cercate ora: 2, trovate: 2)

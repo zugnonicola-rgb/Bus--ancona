@@ -393,17 +393,24 @@ def pulisci_nome(n):
     return re.sub(r"\s+", " ", n).strip(" -")
 
 
-def geocodifica(nome, chiamate):
+def geocodifica(nome, chiamate, esteso=False):
     parti = [pulisci_nome(x) for x in re.split(r"\s+-\s+", nome) if x.strip()]
     cand = []
     for c in [pulisci_nome(nome)] + parti[:1] + parti[-1:]:
         if c and c not in cand:
             cand.append(c)
+    if esteso:
+        pezzi = [pulisci_nome(x) for x in re.split(r"-", nome) if x.strip()]
+        parole = re.sub(r"\b(dif|Sc|Tra|Bivio)\b.*$", "", pulisci_nome(nome)).split()
+        for c in pezzi + [" ".join(parole[:k]) for k in range(len(parole) - 1, 1, -1)][:3]:
+            if len(c) > 4 and c not in cand:
+                cand.append(c)
     for c in cand:
         chiamate[0] += 1
         time.sleep(1.1)
         url = "https://nominatim.openstreetmap.org/search?" + urllib.parse.urlencode(
-            {"q": c + ", Ancona", "format": "jsonv2", "limit": 5, "viewbox": VIEWBOX, "bounded": 1, "countrycodes": "it"})
+            {"q": c + (", Marche" if esteso else ", Ancona"), "format": "jsonv2", "limit": 5, "viewbox": VIEWBOX,
+             "bounded": 0 if esteso else 1, "countrycodes": "it"})
         req = urllib.request.Request(url, headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
         with urllib.request.urlopen(req, timeout=30) as r:
             res = json.loads(r.read().decode("utf-8"))
@@ -411,20 +418,49 @@ def geocodifica(nome, chiamate):
         for x in res:
             lat, lon = float(x["lat"]), float(x["lon"])
             d = km(lat, lon, *CENTRO)
-            if d <= 45 and (best is None or d < best[0]):
+            if d <= (70 if esteso else 45) and (best is None or d < best[0]):
                 best = (d, lat, lon)
         if best:
             return [round(best[1], 5), round(best[2], 5)]
     return None
 
 
+def token(n):
+    stop = {"via", "piazza", "piazzale", "viale", "corso", "capolinea", "di", "della", "del", "dei", "le", "la", "il", "p", "zza"}
+    return {t for t in re.sub(r"[^a-z0-9 ]", " ", pulisci_nome(n).lower()).split() if t not in stop and len(t) > 1}
+
+
+def fermate_osm():
+    q = '[out:json][timeout:60];(node["highway"="bus_stop"](43.40,13.05,43.80,13.85);node["public_transport"="platform"]["bus"="yes"](43.40,13.05,43.80,13.85););out;'
+    req = urllib.request.Request("https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(q),
+                                 headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
+    with urllib.request.urlopen(req, timeout=120) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    return [(e["lat"], e["lon"], e.get("tags", {}).get("name", "")) for e in d.get("elements", [])]
+
+
+def aggancia(c, nome, osm):
+    nt, best = token(nome), None
+    for lat, lon, nm in osm:
+        d = km(c[0], c[1], lat, lon) * 1000
+        if d > 200:
+            continue
+        sim = len(nt & token(nm)) / max(1, len(nt)) if nm else 0
+        score = sim * 100 - d / 4
+        if best is None or score > best[0]:
+            best = (score, lat, lon)
+    return [round(best[1], 5), round(best[2], 5)] if best else c
+
+
 def aggiorna_fermate(dati, report):
-    prec, manuali = {}, {}
+    prec, manuali, falliti, agg = {}, {}, {}, set()
     for nome_file, dest in (("data.json", "prec"), ("fermate_manuali.json", "man")):
         try:
             d = json.load(open(nome_file, encoding="utf-8"))
             if dest == "prec":
                 prec = d.get("fermate", {})
+                falliti = d.get("falliti", {})
+                agg = set(d.get("agganciate", []))
             else:
                 manuali = d
         except Exception:
@@ -436,19 +472,41 @@ def aggiorna_fermate(dati, report):
         if n in manuali:
             coord[n] = manuali[n]
             continue
-        if n in coord or chiamate[0] >= MAX_CHIAMATE or errori >= 5:
+        gia = n in coord
+        if (gia and (coord[n] or falliti.get(n, 0) >= 2)) or chiamate[0] >= MAX_CHIAMATE or errori >= 5:
             continue
         try:
-            coord[n] = geocodifica(n, chiamate)
+            coord[n] = geocodifica(n, chiamate, esteso=gia)
+            if not coord[n]:
+                falliti[n] = 2 if gia else 1
         except Exception as e:
             errori += 1
             report.append("  geocodifica non riuscita per '%s': %s" % (n, e))
             continue
         nuove += 1
         trovate += 1 if coord[n] else 0
+    da_agg = [n for n in nomi if coord.get(n) and n not in manuali and n not in agg]
+    if da_agg:
+        try:
+            osm = fermate_osm()
+            spost = []
+            for n in da_agg:
+                nuovo = aggancia(coord[n], n, osm)
+                spost.append(km(coord[n][0], coord[n][1], nuovo[0], nuovo[1]) * 1000)
+                coord[n] = nuovo
+                agg.add(n)
+            report.append("Agganciate a fermate OpenStreetMap: %d (fermate OSM: %d, spostamento medio %d m)" % (
+                len(da_agg), len(osm), sum(spost) / max(1, len(spost))))
+        except Exception as e:
+            report.append("  aggancio a OpenStreetMap non riuscito (riprovo al prossimo giro): %s" % e)
+    dati["agganciate"] = sorted(n for n in agg if n in nomi)
     ok = sum(1 for n in nomi if coord.get(n))
     report.append("Fermate con posizione: %d/%d (cercate ora: %d, trovate: %d)" % (ok, len(nomi), nuove, trovate))
     dati["fermate"] = {n: coord[n] for n in nomi if n in coord}
+    dati["falliti"] = {n: v for n, v in falliti.items() if n in nomi and not coord.get(n)}
+    senza = [n for n in nomi if not coord.get(n)]
+    if senza:
+        report.append("  senza posizione (%d): %s" % (len(senza), "; ".join(senza[:90])))
 
 
 # ====================== AVVISI ======================

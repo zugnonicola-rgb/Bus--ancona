@@ -39,6 +39,19 @@ html,body{height:100%;overflow:hidden}
 #chiudi{border:0;background:none;color:var(--ink);font-size:22px;padding:4px 8px}
 #chip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;z-index:900;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #chip button{margin-left:auto;border:0;background:none;color:var(--ink);font-size:18px}
+.row{border-top:1px solid var(--line);padding:10px 0;cursor:pointer}
+.card>.row:first-of-type,.card>h3+.row{border-top:0}
+.dep{display:flex;align-items:center;gap:10px}
+.dep .id{min-width:46px;text-align:center;font-size:17px;padding:5px 8px;border-radius:8px;margin:0;color:#fff}
+.mid{flex:1;min-width:0}.dest{font-weight:700;font-size:16px;line-height:1.2}
+.next{text-align:right}.next b{display:block;font-size:26px;line-height:1;font-variant-numeric:tabular-nums}
+.next small{color:var(--acc);font-weight:600;font-size:13px}
+.alt{margin:4px 0 0 56px;color:var(--mute);font-size:15px;font-variant-numeric:tabular-nums}
+h3{margin:0 0 4px;font-size:17px}
+.hint{color:var(--mute);font-size:13px;margin:6px 0}
+#chip .id{color:#fff;margin:0}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--ink)}
+.leaflet-popup-content{margin:10px 12px;min-width:230px}
 </style>
 </head>
 <body>
@@ -54,7 +67,7 @@ html,body{height:100%;overflow:hidden}
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="voyager">Colorata (stile Apple Maps)</option><option value="light_all">Chiara minimale</option><option value="dark_all">Scura</option></select></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
@@ -89,68 +102,45 @@ const mins=t=>{const[a,b]=t.split(".");return +a*60+ +b};
 const dalle=()=>{const[a,b]=($("#ora").value||"00:00").split(":");return +a*60+ +b};
 const has=(n,q)=>n.toLowerCase().includes(q.trim().toLowerCase());
 const dopo=(tt,n)=>tt.map((t,i)=>[t,i]).filter(([t])=>t&&mins(t)>=dalle()).slice(0,n);
-const ore=l=>l.length?`<div class="ore">${l.map(t=>`<span class="t">${t}</span>`).join("")}</div>`:`<p class="mute">Nessuna corsa dopo quell'ora nei dati.</p>`;
-const head=l=>`<span class="id">${esc(l.id)}</span><span class="dir">${esc(l.dir)}</span>`;
+const hue=id=>{let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h};
+const col=id=>`hsl(${hue(id)} 62% 40%)`;
+const badge=l=>`<span class="id" style="background:${col(l.id)}">${esc(l.id)}</span>`;
+const fine=l=>l.dir.split(" → ").pop(), inizio=l=>l.dir.split(" → ")[0];
+const hm=t=>t.replace(".",":");
+const adesso=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()};
+let oraManuale=false;
+const setOra=()=>{const d=new Date();$("#ora").value=String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")};
+const tra=t=>{if(oraManuale)return"";const m=mins(t)-adesso();return m<=0?"in partenza":m<60?`tra ${m} min`:""};
 function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
- return a.map(x=>`<p class="w">Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
-let nomi=[],lista="";
-let IDX={};
-function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1]])));nomi=[...new Set(ATT.flatMap(l=>l.f.map(s=>s[0])))].sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
-let tab="",LAY=null,USER=null;
+ return a.map(x=>`<p class="w">⚠ Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
+let nomi=[],lista="",IDX={};
+function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1]])));
+ nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
+let tab="",LAY=null,USER=null,TILES=null,drawId=0;const RC={};
 const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario"};
+function dep(l,tt,sub){return `<div class="row" data-map="${ATT.indexOf(l)}"><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}</div><div class="mute">${sub||"da "+esc(inizio(l))}</div></div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}</div>${tt.length>1?`<div class="alt">${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div>`}
+function righe(n,max){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,4).map(x=>x[0])]).sort((a,b)=>(a[1][0]?mins(a[1][0]):9999)-(b[1][0]?mins(b[1][0]):9999));
+ return (max?r.slice(0,max):r).map(([l,t])=>dep(l,t)).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")}
 function vFermata(){
- $("#vista").innerHTML=`<label for="q">Nome fermata</label><input id="q" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off">${lista}<div id="r"></div>`;
+ $("#vista").innerHTML=`<input id="q" list="fermate" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off">${lista}<p class="hint">Tocca una linea per vederne il percorso sulla mappa.</p><div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
-  let h="";ATT.forEach(l=>l.f.forEach(s=>{if(has(s[0],q))h+=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],4).map(x=>x[0]))}${warn(l)}</div>`}));
-  $("#r").innerHTML=h||'<p class="mute">Nessuna fermata trovata nei dati di esempio.</p>'};
- $("#q").oninput=go;go();
-}
+  const nm=nomi.filter(n=>has(n,q)).sort((a,b)=>a.length-b.length).slice(0,8);
+  $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)}</h3>${righe(n)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
+ $("#q").oninput=go;go()}
 function vLinea(){
- $("#vista").innerHTML=`<label for="sl">Linea e direzione</label><select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · ${esc(l.dir)}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><div id="r"></div>`;
+ $("#vista").innerHTML=`<select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · verso ${esc(fine(l))}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><p class="hint">Tocca la linea per vedere il percorso sulla mappa.</p><div id="r"></div>`;
+ const show=()=>{const l=ATT[$("#sl").value],s=l.f[$("#sf").value];$("#r").innerHTML=`<div class="card">${dep(l,dopo(s[1],6).map(x=>x[0]),esc(s[0]))}</div>`};
  const fill=()=>{const l=ATT[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
- const show=()=>{const l=ATT[$("#sl").value],s=l.f[$("#sf").value];
-  $("#r").innerHTML=`<div class="card">${head(l)}<div class="mute">${esc(s[0])}</div>${ore(dopo(s[1],6).map(x=>x[0]))}${warn(l)}${mapBtn(l)}</div>`};
- $("#sl").onchange=fill;$("#sf").onchange=show;fill();
-}
+ $("#sl").onchange=fill;$("#sf").onchange=show;fill()}
 function vAB(){
- $("#vista").innerHTML=`<label for="da">Partenza</label><input id="da" list="fermate" placeholder="Es. Piazza Roma" autocomplete="off"><label for="a">Arrivo</label><input id="a" list="fermate" placeholder="Es. Stazione FS" autocomplete="off">${lista}<div id="r"></div>`;
- const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML='<p class="mute">Scegli partenza e arrivo. Solo bus diretti, senza cambi.</p>';return}
+ $("#vista").innerHTML=`<input id="da" list="fermate" placeholder="Partenza" autocomplete="off"><label for="a"></label><input id="a" list="fermate" placeholder="Arrivo" autocomplete="off">${lista}<p class="hint">Solo bus diretti, senza cambi. Tocca una linea per il percorso.</p><div id="r"></div>`;
+ const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML="";return}
   let h="";ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
-   const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,3);
-   h+=`<div class="card">${head(l)}<div class="mute">${esc(l.f[i][0])} → ${esc(l.f[j][0])}</div>${tr.length?tr.map(([p,r])=>`<div class="ore"><span class="t">${p}</span><span class="mute" style="align-self:center">arrivo ${r} · ${mins(r)-mins(p)} min</span></div>`).join(""):'<p class="mute">Nessuna corsa dopo quell\'ora nei dati.</p>'}${warn(l)}${mapBtn(l)}</div>`});
-  $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato nei dati di esempio.</p>'};
- $("#da").oninput=go;$("#a").oninput=go;go();
-}
-function render(){
- $("#sheet").hidden=!tab;
- document.querySelectorAll("#bar button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===tab));
- if(!tab)return;
- $("#stit").textContent=TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
- if(tab==="imp")return;
- ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino})[tab]()}
-function vista(){render()}
-$("#ora").onchange=vista;
-const mapBtn=l=>COORD&&Object.keys(COORD).length?`<button class="btn" data-map="${ATT.indexOf(l)}">Vedi sulla mappa</button>`:"";
-const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-function popStop(n){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,3).map(x=>x[0])]).filter(x=>x[1].length).sort((a,b)=>mins(a[1][0])-mins(b[1][0]));
- return `<strong>${esc(n)}</strong>`+(r.slice(0,6).map(([l,t])=>`<div><b>${esc(l.id)}</b> <span class="mute">${esc(l.dir.split(" → ").pop())}</span><br>${t.join(" · ")}${DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*"))?" ⚠":""}</div>`).join("")||'<div class="mute">Nessuna corsa dopo quell\'ora</div>')+(r.length>6?`<div class="mute">+${r.length-6} altre linee</div>`:"")}
-function initMap(){
- if(!window.L){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
- MAP=L.map("map",{zoomControl:false}).setView([43.6158,13.5189],13);
- L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"&copy; OpenStreetMap"}).addTo(MAP);
- L.control.zoom({position:"topright"}).addTo(MAP);LAY=L.layerGroup().addTo(MAP)}
-function punto(n,ev){const c=COORD[n];if(!c)return;
- L.circleMarker(c,{radius:ev?7:4,color:ev?"#0e6e7e":"#6b7f88",weight:1,fillOpacity:ev?.95:.5,fillColor:ev?"#0e6e7e":"#6b7f88"}).addTo(LAY).bindPopup(()=>popStop(n))}
-function drawMap(){
- if(!MAP)return;LAY.clearLayers();const chip=$("#chip");
- if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';return}
- if(mapLine===""){chip.hidden=true;Object.keys(IDX).forEach(n=>punto(n,false));return}
- const l=ATT[mapLine],pts=l.f.map(x=>COORD[x[0]]).filter(Boolean);
- const pl=L.polyline(pts,{color:"#0e6e7e",weight:4}).addTo(LAY);l.f.forEach(x=>punto(x[0],true));
- if(pts.length)MAP.fitBounds(pl.getBounds(),{padding:[30,30]});
- const m=l.f.filter(x=>!COORD[x[0]]).length;
- chip.hidden=false;chip.innerHTML=`<span class="id">${esc(l.id)}</span><span>${esc(l.dir)}${m?` <span class="mute">(${m} fermate senza posizione)</span>`:""}</span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
- $("#x").onclick=()=>{mapLine="";drawMap()}}
+   const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,4);
+   const sub=tr.length?`arrivo ${hm(tr[0][1])} · ${mins(tr[0][1])-mins(tr[0][0])} min`:"nessuna corsa dopo quell'ora";
+   h+=`<div class="card">${dep(l,tr.map(x=>x[0]),sub)}</div>`});
+  $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato.</p>'};
+ $("#da").oninput=go;$("#a").oninput=go;go()}
 function vVicino(){
  $("#vista").innerHTML='<p class="mute" id="r">Cerco la tua posizione…</p>';
  const err=t=>{$("#r").textContent=t};
@@ -160,12 +150,60 @@ function vVicino(){
   if(MAP){if(USER)MAP.removeLayer(USER);USER=L.circleMarker([a,b],{radius:8,color:"#fff",weight:2,fillColor:"#1a73e8",fillOpacity:1}).addTo(MAP);
    MAP.setView([a,b],16,{animate:false});MAP.panBy([0,Math.round(innerHeight*.18)],{animate:false})}
   const v=Object.keys(IDX).filter(n=>COORD[n]).map(n=>[n,dist(a,b,COORD[n][0],COORD[n][1])]).sort((x,y)=>x[1]-y[1]).slice(0,4);
-  $("#vista").innerHTML=v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div>${popStop(n)}</div>`).join("")},
+  $("#vista").innerHTML='<p class="hint">Tocca una linea per vederne il percorso.</p>'+v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div><h3>${esc(n)}</h3>${righe(n,3)}</div>`).join("")},
   ()=>err("Non riesco a ottenere la posizione: controlla i permessi del browser."),{enableHighAccuracy:true,timeout:15000})}
-$("#vista").addEventListener("click",e=>{const b=e.target.closest("[data-map]");if(b){mapLine=b.dataset.map;tab="";render();drawMap()}});
+function render(){
+ if(!oraManuale)setOra();
+ $("#sheet").hidden=!tab;
+ document.querySelectorAll("#bar button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===tab));
+ if(!tab)return;
+ $("#stit").textContent=TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
+ if(tab==="imp")return;
+ ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino})[tab]()}
+function vista(){render()}
+const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
+function popStop(n){return `<h3>${esc(n)}</h3>`+righe(n,4)}
+function stileMappa(){let v="auto";try{v=localStorage.getItem("stile")||"auto"}catch(e){}
+ return v==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark_all":"voyager"):v}
+function setTiles(){if(!MAP)return;if(TILES)MAP.removeLayer(TILES);
+ TILES=L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${stileMappa()}/{z}/{x}/{y}{r}.png`,{subdomains:"abcd",maxZoom:20,attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(MAP)}
+function initMap(){
+ if(!window.L){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
+ MAP=L.map("map",{zoomControl:false}).setView([43.6158,13.5189],13);setTiles();
+ L.control.zoom({position:"topright"}).addTo(MAP);LAY=L.layerGroup().addTo(MAP)}
+function punto(n,ev,c){const p=COORD[n];if(!p)return;
+ L.circleMarker(p,{radius:ev?7:5,color:c||"#0e6e7e",weight:2.5,fillOpacity:1,fillColor:ev?(c||"#0e6e7e"):"#fff"}).addTo(LAY).bindPopup(()=>popStop(n),{maxWidth:300})}
+function tracciaLinea(l,c,g){LAY.clearLayers();
+ const pts=l.f.map(x=>COORD[x[0]]).filter(Boolean);
+ const pl=L.polyline(g||pts,g?{color:c,weight:5,opacity:.9}:{color:c,weight:4,dashArray:"6 8",opacity:.8}).addTo(LAY);
+ l.f.forEach(x=>punto(x[0],true,c));return pl}
+async function percorso(l){const k=l.id+"|"+l.dir+"|"+l.tipo;if(k in RC)return RC[k];
+ let pts=l.f.map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
+ if(pts.length<2)return RC[k]=null;
+ if(pts.length>80)pts=pts.filter((p,i)=>i===pts.length-1||i%Math.ceil(pts.length/80)===0);
+ try{const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+pts.map(p=>p[1]+","+p[0]).join(";")+"?overview=full&geometries=geojson");
+  const j=await r.json();if(j.routes&&j.routes[0])return RC[k]=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]])}catch(e){}
+ return null}
+async function drawMap(){
+ if(!MAP)return;const my=++drawId;LAY.clearLayers();const chip=$("#chip");
+ if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';return}
+ if(mapLine===""){chip.hidden=true;Object.keys(IDX).forEach(n=>punto(n,false));return}
+ const l=ATT[mapLine],c=col(l.id),m=l.f.filter(x=>!COORD[x[0]]).length;
+ const pl=tracciaLinea(l,c,null);if(pl.getBounds)MAP.fitBounds(pl.getBounds(),{padding:[40,40]});
+ chip.hidden=false;chip.innerHTML=`${badge(l)}<span>verso ${esc(fine(l))}<br><span class="mute" id="rs">Calcolo il percorso…</span></span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
+ $("#x").onclick=()=>{mapLine="";drawMap()};
+ const g=await percorso(l);if(my!==drawId)return;
+ if(g)tracciaLinea(l,c,g);
+ $("#rs").textContent=(g?"Percorso sulle strade":"Percorso indicativo")+(m?` · ${m} fermate senza posizione`:"")}
+document.addEventListener("click",e=>{if(e.target.closest("a"))return;const b=e.target.closest("[data-map]");
+ if(b){mapLine=b.dataset.map;tab="";render();if(MAP)MAP.closePopup();drawMap()}});
 document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
 $("#chiudi").onclick=()=>{tab="";render()};
-
+$("#ora").addEventListener("input",()=>{oraManuale=true});
+$("#ora").onchange=vista;
+$("#adesso").onclick=()=>{oraManuale=false;setOra();render()};
+$("#stile").onchange=()=>{try{localStorage.setItem("stile",$("#stile").value)}catch(e){}setTiles()};
+try{$("#stile").value=localStorage.getItem("stile")||"auto"}catch(e){}
 function indovina(tipi){const d=new Date(),m=d.getMonth()+1,g=d.getDate();
  const est=(m>6&&m<9)||(m===6&&g>=8)||(m===9&&g<=14);
  const w=(d.getDay()===0?"Festivo":"Feriale")+" "+(est?"estivo":"invernale");
@@ -179,7 +217,7 @@ async function carica(){
  try{const r=await fetch("data.json",{cache:"no-cache"});if(r.ok){const d=await r.json();if(d.linee&&d.linee.length){DATA.linee=d.linee;SAMPLE=false;GEN=d.generato;COORD=Object.fromEntries(Object.entries(d.fermate||{}).filter(e=>e[1]))}}}catch(e){}
  if(SAMPLE){DATA.linee.forEach(l=>l.tipo="Festivo invernale (esempio)");$("#nota").textContent="Dati di esempio (festivo, solo alcune corse del 2024). Orari di tabella, non in tempo reale."}
  else{try{const r=await fetch("avvisi.json",{cache:"no-cache"});DATA.avvisi=r.ok?(await r.json()).avvisi||[]:[]}catch(e){DATA.avvisi=[]}
-  const n=new Date();$("#ora").value=String(n.getHours()).padStart(2,"0")+":"+String(n.getMinutes()).padStart(2,"0");
+  const n=new Date();
   $("#nota").innerHTML="Orari di tabella aggiornati il "+esc(GEN)+". Non in tempo reale. <a href=\"report.txt\">Stato dati</a>"}
  const tipi=[...new Set(DATA.linee.map(l=>l.tipo))];
  $("#per").innerHTML=tipi.map(t=>`<option>${esc(t)}</option>`).join("");$("#per").value=indovina(tipi);$("#per").onchange=applica;

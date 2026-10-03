@@ -5,7 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bus Ancona</title>
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.css">
 <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+<script>window.maplibregl||document.write('<script src="https://cdn.jsdelivr.net/npm/maplibre-gl/dist/maplibre-gl.js"><\/script>')</script>
 <style>
 :root{--bg:#eef2f4;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d3dde2;--acc:#0e6e7e;--on:#fff;--warn:#8a5200;--warnbg:#fff1d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}}
@@ -185,12 +187,16 @@ function assicura(){if(!MAP||!MAP.isStyleLoaded()||MAP.getSource("linea"))return
  PRONTA=true;drawMap()}
 class Ctl3D{onAdd(m){const d=document.createElement("div");d.className="maplibregl-ctrl maplibregl-ctrl-group";const b=document.createElement("button");b.type="button";b.textContent="3D";b.style.cssText="font-weight:700;width:29px;height:29px";
  b.onclick=()=>{const p=m.getPitch()>10;m.easeTo({pitch:p?0:60,bearing:p?0:-20,duration:700})};d.appendChild(b);this.d=d;return d}onRemove(){this.d.remove()}}
+function mapErr(t,d){$("#map").innerHTML=`<div style="padding:90px 24px;text-align:center"><p>${t}</p><p class="mute" style="font-size:12px">${esc(d||"")}</p></div>`}
 function initMap(){
- if(!window.maplibregl){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
- MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true}});
- MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
- MAP.addControl(new Ctl3D(),"top-right");
- MAP.on("style.load",assicura);MAP.on("styledata",assicura)}
+ if(!window.maplibregl)return mapErr("Non riesco a scaricare la libreria della mappa. Controlla la connessione e ricarica la pagina. Gli orari funzionano dal menu in basso.","libreria mappa non caricata");
+ try{
+  MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true}});
+  MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
+  MAP.addControl(new Ctl3D(),"top-right");
+  MAP.on("style.load",assicura);MAP.on("styledata",assicura);
+  MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
+ }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
 async function percorso(l){const k=l.id+"|"+l.dir+"|"+l.tipo;if(k in RC)return RC[k];
  let pts=l.f.map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
  if(pts.length<2)return RC[k]=null;

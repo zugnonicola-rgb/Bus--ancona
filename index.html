@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Bus Ancona</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css">
+<script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
 <style>
 :root{--bg:#eef2f4;--card:#fff;--ink:#12303b;--mute:#5d7580;--line:#d3dde2;--acc:#0e6e7e;--on:#fff;--warn:#8a5200;--warnbg:#fff1d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1d24;--card:#15303a;--ink:#e6f0f3;--mute:#93aab3;--line:#264652;--acc:#4fc3d4;--on:#06222a;--warn:#ffc15a;--warnbg:#3b2d0f}}
@@ -37,7 +37,7 @@ html,body{height:100%;overflow:hidden}
 #sheet[hidden],#chip[hidden],#imp[hidden],#vista[hidden]{display:none}
 .sh{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
 #chiudi{border:0;background:none;color:var(--ink);font-size:22px;padding:4px 8px}
-#chip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:10px;z-index:900;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+#chip{position:fixed;top:calc(env(safe-area-inset-top,0px) + 10px);left:10px;right:60px;z-index:900;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;display:flex;align-items:center;gap:6px;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 #chip button{margin-left:auto;border:0;background:none;color:var(--ink);font-size:18px}
 .row{border-top:1px solid var(--line);padding:10px 0;cursor:pointer}
 .card>.row:first-of-type,.card>h3+.row{border-top:0}
@@ -50,8 +50,11 @@ html,body{height:100%;overflow:hidden}
 h3{margin:0 0 4px;font-size:17px}
 .hint{color:var(--mute);font-size:13px;margin:6px 0}
 #chip .id{color:#fff;margin:0}
-.leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--card);color:var(--ink)}
-.leaflet-popup-content{margin:10px 12px;min-width:230px}
+.maplibregl-popup-content{background:var(--card);color:var(--ink);padding:10px 12px;min-width:230px;border-radius:10px}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--card)}
+.maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:var(--card)}
+.maplibregl-popup-close-button{color:var(--ink);font-size:20px}
+.me{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 4px rgba(26,115,232,.25)}
 </style>
 </head>
 <body>
@@ -67,7 +70,7 @@ h3{margin:0 0 4px;font-size:17px}
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="voyager">Colorata (stile Apple Maps)</option><option value="light_all">Chiara minimale</option><option value="dark_all">Scura</option></select></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><p class="hint">Per gli edifici in 3D scegli Standard e tocca il pulsante 3D sulla mappa (si inclina anche con due dita).</p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
@@ -103,7 +106,7 @@ const dalle=()=>{const[a,b]=($("#ora").value||"00:00").split(":");return +a*60+ 
 const has=(n,q)=>n.toLowerCase().includes(q.trim().toLowerCase());
 const dopo=(tt,n)=>tt.map((t,i)=>[t,i]).filter(([t])=>t&&mins(t)>=dalle()).slice(0,n);
 const hue=id=>{let h=0;for(const c of String(id))h=(h*31+c.charCodeAt(0))%360;return h};
-const col=id=>`hsl(${hue(id)} 62% 40%)`;
+const col=id=>`hsl(${hue(id)},62%,40%)`;
 const badge=l=>`<span class="id" style="background:${col(l.id)}">${esc(l.id)}</span>`;
 const fine=l=>l.dir.split(" → ").pop(), inizio=l=>l.dir.split(" → ")[0];
 const hm=t=>t.replace(".",":");
@@ -116,7 +119,7 @@ function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.i
 let nomi=[],lista="",IDX={};
 function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1]])));
  nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
-let tab="",LAY=null,USER=null,TILES=null,drawId=0;const RC={};
+let tab="",USER=null,drawId=0;const RC={};
 const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario"};
 function dep(l,tt,sub){return `<div class="row" data-map="${ATT.indexOf(l)}"><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}</div><div class="mute">${sub||"da "+esc(inizio(l))}</div></div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}</div>${tt.length>1?`<div class="alt">${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div>`}
 function righe(n,max){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,4).map(x=>x[0])]).sort((a,b)=>(a[1][0]?mins(a[1][0]):9999)-(b[1][0]?mins(b[1][0]):9999));
@@ -147,8 +150,8 @@ function vVicino(){
  if(!Object.keys(COORD).length)return err("Le posizioni delle fermate non sono ancora pronte.");
  if(!navigator.geolocation)return err("Posizione non disponibile su questo dispositivo.");
  navigator.geolocation.getCurrentPosition(p=>{const a=p.coords.latitude,b=p.coords.longitude;
-  if(MAP){if(USER)MAP.removeLayer(USER);USER=L.circleMarker([a,b],{radius:8,color:"#fff",weight:2,fillColor:"#1a73e8",fillOpacity:1}).addTo(MAP);
-   MAP.setView([a,b],16,{animate:false});MAP.panBy([0,Math.round(innerHeight*.18)],{animate:false})}
+  if(MAP){if(USER)USER.remove();const e=document.createElement("div");e.className="me";USER=new maplibregl.Marker({element:e}).setLngLat([b,a]).addTo(MAP);
+   MAP.easeTo({center:[b,a],zoom:16,offset:[0,-Math.round(innerHeight*.15)],duration:0})}
   const v=Object.keys(IDX).filter(n=>COORD[n]).map(n=>[n,dist(a,b,COORD[n][0],COORD[n][1])]).sort((x,y)=>x[1]-y[1]).slice(0,4);
   $("#vista").innerHTML='<p class="hint">Tocca una linea per vederne il percorso.</p>'+v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div><h3>${esc(n)}</h3>${righe(n,3)}</div>`).join("")},
   ()=>err("Non riesco a ottenere la posizione: controlla i permessi del browser."),{enableHighAccuracy:true,timeout:15000})}
@@ -163,47 +166,62 @@ function render(){
 function vista(){render()}
 const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 function popStop(n){return `<h3>${esc(n)}</h3>`+righe(n,4)}
-function stileMappa(){let v="auto";try{v=localStorage.getItem("stile")||"auto"}catch(e){}
- return v==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark_all":"voyager"):v}
-function setTiles(){if(!MAP)return;if(TILES)MAP.removeLayer(TILES);
- TILES=L.tileLayer(`https://{s}.basemaps.cartocdn.com/rastertiles/${stileMappa()}/{z}/{x}/{y}{r}.png`,{subdomains:"abcd",maxZoom:20,attribution:"&copy; OpenStreetMap &copy; CARTO"}).addTo(MAP)}
+const STILI={liberty:"https://tiles.openfreemap.org/styles/liberty",positron:"https://tiles.openfreemap.org/styles/positron",dark:"https://tiles.openfreemap.org/styles/dark",bright:"https://tiles.openfreemap.org/styles/bright"};
+let PRONTA=false,POP=null,EV=false;
+function stileMappa(){let v="auto";try{v=localStorage.getItem("stile2")||"auto"}catch(e){}
+ if(v==="auto")v=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"liberty";return STILI[v]||STILI.liberty}
+const FC=f=>({type:"FeatureCollection",features:f});
+const pt=(n,ev,c)=>({type:"Feature",properties:{name:n,ev:ev?1:0,c:c||"#0e6e7e"},geometry:{type:"Point",coordinates:[COORD[n][1],COORD[n][0]]}});
+function setDati(s,l){if(!MAP)return;const a=MAP.getSource("fermate"),b=MAP.getSource("linea");if(a)a.setData(FC(s));if(b)b.setData(FC(l))}
+function assicura(){if(!MAP||!MAP.isStyleLoaded()||MAP.getSource("linea"))return;
+ MAP.addSource("linea",{type:"geojson",data:FC([])});MAP.addSource("fermate",{type:"geojson",data:FC([])});
+ const lay={"line-cap":"round","line-join":"round"};
+ MAP.addLayer({id:"linea-ind",type:"line",source:"linea",filter:["==",["get","ind"],1],layout:lay,paint:{"line-color":["get","c"],"line-width":4,"line-dasharray":[2,2],"line-opacity":.85}});
+ MAP.addLayer({id:"linea-str",type:"line",source:"linea",filter:["==",["get","ind"],0],layout:lay,paint:{"line-color":["get","c"],"line-width":5.5,"line-opacity":.92}});
+ MAP.addLayer({id:"fermate",type:"circle",source:"fermate",paint:{"circle-radius":["case",["==",["get","ev"],1],7,5],"circle-color":["case",["==",["get","ev"],1],["get","c"],"#ffffff"],"circle-stroke-color":["get","c"],"circle-stroke-width":2.5}});
+ if(!EV){EV=true;
+  MAP.on("click","fermate",e=>{const f=e.features[0];if(POP)POP.remove();POP=new maplibregl.Popup({maxWidth:"300px",offset:10}).setLngLat(f.geometry.coordinates).setHTML(popStop(f.properties.name)).addTo(MAP)});
+  MAP.on("mouseenter","fermate",()=>MAP.getCanvas().style.cursor="pointer");MAP.on("mouseleave","fermate",()=>MAP.getCanvas().style.cursor="")}
+ PRONTA=true;drawMap()}
+class Ctl3D{onAdd(m){const d=document.createElement("div");d.className="maplibregl-ctrl maplibregl-ctrl-group";const b=document.createElement("button");b.type="button";b.textContent="3D";b.style.cssText="font-weight:700;width:29px;height:29px";
+ b.onclick=()=>{const p=m.getPitch()>10;m.easeTo({pitch:p?0:60,bearing:p?0:-20,duration:700})};d.appendChild(b);this.d=d;return d}onRemove(){this.d.remove()}}
 function initMap(){
- if(!window.L){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
- MAP=L.map("map",{zoomControl:false}).setView([43.6158,13.5189],13);setTiles();
- L.control.zoom({position:"topright"}).addTo(MAP);LAY=L.layerGroup().addTo(MAP)}
-function punto(n,ev,c){const p=COORD[n];if(!p)return;
- L.circleMarker(p,{radius:ev?7:5,color:c||"#0e6e7e",weight:2.5,fillOpacity:1,fillColor:ev?(c||"#0e6e7e"):"#fff"}).addTo(LAY).bindPopup(()=>popStop(n),{maxWidth:300})}
-function tracciaLinea(l,c,g){LAY.clearLayers();
- const pts=l.f.map(x=>COORD[x[0]]).filter(Boolean);
- const pl=L.polyline(g||pts,g?{color:c,weight:5,opacity:.9}:{color:c,weight:4,dashArray:"6 8",opacity:.8}).addTo(LAY);
- l.f.forEach(x=>punto(x[0],true,c));return pl}
+ if(!window.maplibregl){$("#map").innerHTML='<p class="mute" style="padding:80px 20px;text-align:center">Impossibile caricare la mappa (serve connessione). Usa il menu in basso per gli orari.</p>';return}
+ MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true}});
+ MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
+ MAP.addControl(new Ctl3D(),"top-right");
+ MAP.on("style.load",assicura);MAP.on("styledata",assicura)}
 async function percorso(l){const k=l.id+"|"+l.dir+"|"+l.tipo;if(k in RC)return RC[k];
  let pts=l.f.map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
  if(pts.length<2)return RC[k]=null;
  if(pts.length>80)pts=pts.filter((p,i)=>i===pts.length-1||i%Math.ceil(pts.length/80)===0);
  try{const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+pts.map(p=>p[1]+","+p[0]).join(";")+"?overview=full&geometries=geojson");
-  const j=await r.json();if(j.routes&&j.routes[0])return RC[k]=j.routes[0].geometry.coordinates.map(c=>[c[1],c[0]])}catch(e){}
+  const j=await r.json();if(j.routes&&j.routes[0])return RC[k]=j.routes[0].geometry.coordinates}catch(e){}
  return null}
+function adatta(pts){if(!pts.length)return;const b=new maplibregl.LngLatBounds(pts[0],pts[0]);pts.forEach(p=>b.extend(p));
+ MAP.fitBounds(b,{padding:{top:90,bottom:60,left:30,right:30},duration:600,maxZoom:16})}
 async function drawMap(){
- if(!MAP)return;const my=++drawId;LAY.clearLayers();const chip=$("#chip");
- if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';return}
- if(mapLine===""){chip.hidden=true;Object.keys(IDX).forEach(n=>punto(n,false));return}
+ if(!MAP||!PRONTA)return;const my=++drawId,chip=$("#chip");
+ if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';setDati([],[]);return}
+ if(mapLine===""){chip.hidden=true;setDati(Object.keys(IDX).filter(n=>COORD[n]).map(n=>pt(n,false)),[]);return}
  const l=ATT[mapLine],c=col(l.id),m=l.f.filter(x=>!COORD[x[0]]).length;
- const pl=tracciaLinea(l,c,null);if(pl.getBounds)MAP.fitBounds(pl.getBounds(),{padding:[40,40]});
+ const stops=l.f.filter(x=>COORD[x[0]]).map(x=>pt(x[0],true,c)),pts=stops.map(f=>f.geometry.coordinates);
+ const riga=(g,ind)=>[{type:"Feature",properties:{c,ind},geometry:{type:"LineString",coordinates:g}}];
+ setDati(stops,riga(pts,1));adatta(pts);
  chip.hidden=false;chip.innerHTML=`${badge(l)}<span>verso ${esc(fine(l))}<br><span class="mute" id="rs">Calcolo il percorso…</span></span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
  $("#x").onclick=()=>{mapLine="";drawMap()};
  const g=await percorso(l);if(my!==drawId)return;
- if(g)tracciaLinea(l,c,g);
+ if(g)setDati(stops,riga(g,0));
  $("#rs").textContent=(g?"Percorso sulle strade":"Percorso indicativo")+(m?` · ${m} fermate senza posizione`:"")}
 document.addEventListener("click",e=>{if(e.target.closest("a"))return;const b=e.target.closest("[data-map]");
- if(b){mapLine=b.dataset.map;tab="";render();if(MAP)MAP.closePopup();drawMap()}});
+ if(b){mapLine=b.dataset.map;tab="";render();if(POP)POP.remove();drawMap()}});
 document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
 $("#chiudi").onclick=()=>{tab="";render()};
 $("#ora").addEventListener("input",()=>{oraManuale=true});
 $("#ora").onchange=vista;
 $("#adesso").onclick=()=>{oraManuale=false;setOra();render()};
-$("#stile").onchange=()=>{try{localStorage.setItem("stile",$("#stile").value)}catch(e){}setTiles()};
-try{$("#stile").value=localStorage.getItem("stile")||"auto"}catch(e){}
+$("#stile").onchange=()=>{try{localStorage.setItem("stile2",$("#stile").value)}catch(e){}if(MAP){PRONTA=false;MAP.setStyle(stileMappa())}};
+try{const v=localStorage.getItem("stile2");$("#stile").value=v&&STILI[v]?v:"auto"}catch(e){}
 function indovina(tipi){const d=new Date(),m=d.getMonth()+1,g=d.getDate();
  const est=(m>6&&m<9)||(m===6&&g>=8)||(m===9&&g<=14);
  const w=(d.getDay()===0?"Festivo":"Feriale")+" "+(est?"estivo":"invernale");

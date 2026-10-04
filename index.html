@@ -55,6 +55,7 @@ h3{margin:0 0 4px;font-size:17px}
 .maplibregl-popup-content{background:var(--card);color:var(--ink);padding:10px 12px;min-width:230px;border-radius:10px}
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip{border-top-color:var(--card)}
 .maplibregl-popup-anchor-top .maplibregl-popup-tip{border-bottom-color:var(--card)}
+.maplibregl-popup-content{max-height:48vh;overflow:auto}
 .maplibregl-popup-close-button{color:var(--ink);font-size:20px}
 .me{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 4px rgba(26,115,232,.25)}
 </style>
@@ -72,7 +73,7 @@ h3{margin:0 0 4px;font-size:17px}
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><p class="hint">Per gli edifici in 3D scegli Standard e tocca il pulsante 3D sulla mappa (si inclina anche con due dita).</p></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><p class="hint" id="diag"></p><p class="hint">Per gli edifici in 3D scegli Standard e tocca il pulsante 3D sulla mappa (si inclina anche con due dita).</p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Ho capito</button></dialog>
@@ -119,18 +120,22 @@ const tra=t=>{if(oraManuale)return"";const m=mins(t)-adesso();return m<=0?"in pa
 function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
  return a.map(x=>`<p class="w">⚠ Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
 let nomi=[],lista="",IDX={};
-function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1]])));
+function prepara(){IDX={};ATT.forEach(l=>l.f.forEach((st,i)=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1],i])));
  nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 let tab="",USER=null,drawId=0;const RC={};
 const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario"};
 function dep(l,tt,sub,seg){return `<div class="row" data-map="${ATT.indexOf(l)}"${seg?` data-seg="${seg}"`:""}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}</div><div class="mute">${sub||"da "+esc(inizio(l))}</div></div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}</div>${tt.length>1?`<div class="alt">${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div>`}
-function righe(n,max){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,4).map(x=>x[0])]).sort((a,b)=>(a[1][0]?mins(a[1][0]):9999)-(b[1][0]?mins(b[1][0]):9999));
- return (max?r.slice(0,max):r).map(([l,t])=>dep(l,t)).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Orario).</p>`:"")}
+function righe(n,max,win){const base=dalle();
+ let r=(IDX[n]||[]).map(([l,t,i])=>{let tt=t.filter(x=>x&&mins(x)>=base);if(win)tt=tt.filter(x=>mins(x)<=base+win);return [l,tt.slice(0,win?10:4),i]});
+ if(win){r=r.filter(x=>x[1].length);if(!r.length)return `<p class="hint">Nessun bus nell'ora successiva alle ${esc($("#ora").value)}. Ecco i prossimi:</p>`+righe(n,max)}
+ r.sort((a,b)=>(a[1][0]?mins(a[1][0]):9999)-(b[1][0]?mins(b[1][0]):9999));
+ const card=([l,t,i])=>dep(l,t,undefined,i+","+(l.f.length-1));
+ return (max?r.slice(0,max):r).map(card).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Orario).</p>`:"")}
 function vFermata(){
  $("#vista").innerHTML=`<input id="q" list="fermate" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off">${lista}<p class="hint">Tocca una linea per vederne il percorso sulla mappa.</p><div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
   const nm=nomi.filter(n=>has(n,q)).sort((a,b)=>a.length-b.length).slice(0,8);
-  $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)}</h3>${righe(n)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
+  $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)}</h3>${righe(n,0,60)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
  $("#q").oninput=go;go()}
 function vLinea(){
  $("#vista").innerHTML=`<select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · verso ${esc(fine(l))}</option>`).join("")}</select><label for="sf">Fermata</label><select id="sf"></select><p class="hint">Tocca la linea per vedere il percorso sulla mappa.</p><div id="r"></div>`;
@@ -157,7 +162,7 @@ function vVicino(){
   if(MAP){if(USER)USER.remove();const e=document.createElement("div");e.className="me";USER=new maplibregl.Marker({element:e}).setLngLat([b,a]).addTo(MAP);
    MAP.easeTo({center:[b,a],zoom:16,offset:[0,-Math.round(innerHeight*.15)],duration:0})}
   const v=Object.keys(IDX).filter(n=>COORD[n]).map(n=>[n,dist(a,b,COORD[n][0],COORD[n][1])]).sort((x,y)=>x[1]-y[1]).slice(0,4);
-  $("#vista").innerHTML='<p class="hint">Tocca una linea per vederne il percorso.</p>'+v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div><h3>${esc(n)}</h3>${righe(n,3)}</div>`).join("")},
+  $("#vista").innerHTML='<p class="hint">Tocca una linea per vederne il percorso.</p>'+v.map(([n,d])=>`<div class="card"><div class="mute">a circa ${Math.round(d/10)*10} m</div><h3>${esc(n)}</h3>${righe(n,0,60)}</div>`).join("")},
   ()=>err("Non riesco a ottenere la posizione: controlla i permessi del browser."),{enableHighAccuracy:true,timeout:15000})}
 function render(){
  if(!oraManuale)setOra();
@@ -169,24 +174,27 @@ function render(){
  ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino})[tab]()}
 function vista(){render()}
 const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
-function popStop(n){return `<h3>${esc(n)}</h3>`+righe(n,4)}
+function popStop(n){return `<h3>${esc(n)}</h3><p class="hint" style="margin-top:0">Bus nella prossima ora · tocca una linea per il percorso</p>`+righe(n,0,60)}
 const STILI={liberty:"https://tiles.openfreemap.org/styles/liberty",positron:"https://tiles.openfreemap.org/styles/positron",dark:"https://tiles.openfreemap.org/styles/dark",bright:"https://tiles.openfreemap.org/styles/bright"};
 let PRONTA=false,POP=null,EV=false;
 function stileMappa(){let v="auto";try{v=localStorage.getItem("stile2")||"auto"}catch(e){}
  if(v==="auto")v=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"liberty";return STILI[v]||STILI.liberty}
 const FC=f=>({type:"FeatureCollection",features:f});
 const pt=(n,ev,c)=>({type:"Feature",properties:{name:n,ev:ev?1:0,c:c||"#0e6e7e"},geometry:{type:"Point",coordinates:[COORD[n][1],COORD[n][0]]}});
-function setDati(s,l){if(!MAP)return;const a=MAP.getSource("fermate"),b=MAP.getSource("linea");if(a)a.setData(FC(s));if(b)b.setData(FC(l))}
-function assicura(){if(!MAP||!MAP.isStyleLoaded()||MAP.getSource("linea"))return;
- MAP.addSource("linea",{type:"geojson",data:FC([])});MAP.addSource("fermate",{type:"geojson",data:FC([])});
- const lay={"line-cap":"round","line-join":"round"};
- MAP.addLayer({id:"linea-ind",type:"line",source:"linea",filter:["==",["get","ind"],1],layout:lay,paint:{"line-color":["get","c"],"line-width":4,"line-dasharray":[2,2],"line-opacity":.85}});
- MAP.addLayer({id:"linea-str",type:"line",source:"linea",filter:["==",["get","ind"],0],layout:lay,paint:{"line-color":["get","c"],"line-width":5.5,"line-opacity":.92}});
- MAP.addLayer({id:"fermate",type:"circle",source:"fermate",paint:{"circle-radius":["case",["==",["get","ev"],1],7,5],"circle-color":["case",["==",["get","ev"],1],["get","c"],"#ffffff"],"circle-stroke-color":["get","c"],"circle-stroke-width":2.5}});
- if(!EV){EV=true;
-  MAP.on("click",e=>{const r=14,f=MAP.queryRenderedFeatures([[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]],{layers:["fermate"]});
-   if(!f.length)return;const q=f[0];if(POP)POP.remove();POP=new maplibregl.Popup({maxWidth:"300px",offset:10}).setLngLat(q.geometry.coordinates).setHTML(popStop(q.properties.name)).addTo(MAP)})}
- PRONTA=true;drawMap()}
+function setDati(s,l){if(!MAP)return;diag(`Mappa: ${s.length} fermate disegnate`+(l.length?`, linea con ${l[0].geometry.coordinates.length} punti`:""));const a=MAP.getSource("fermate"),b=MAP.getSource("linea");if(a)a.setData(FC(s));if(b)b.setData(FC(l))}
+const diag=t=>{const e=$("#diag");if(e)e.textContent=t};
+function assicura(){if(!MAP||MAP.getSource("linea"))return;
+ try{
+  MAP.addSource("linea",{type:"geojson",data:FC([])});MAP.addSource("fermate",{type:"geojson",data:FC([])});
+  const lay={"line-cap":"round","line-join":"round"};
+  MAP.addLayer({id:"linea-ind",type:"line",source:"linea",filter:["==",["get","ind"],1],layout:lay,paint:{"line-color":["get","c"],"line-width":4,"line-dasharray":[2,2],"line-opacity":.85}});
+  MAP.addLayer({id:"linea-str",type:"line",source:"linea",filter:["==",["get","ind"],0],layout:lay,paint:{"line-color":["get","c"],"line-width":5.5,"line-opacity":.92}});
+  MAP.addLayer({id:"fermate",type:"circle",source:"fermate",paint:{"circle-radius":["case",["==",["get","ev"],1],7,5],"circle-color":["case",["==",["get","ev"],1],["get","c"],"#ffffff"],"circle-stroke-color":["get","c"],"circle-stroke-width":2.5}});
+  if(!EV){EV=true;
+   MAP.on("click",e=>{try{const r=14,f=MAP.queryRenderedFeatures([[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]],{layers:["fermate"]});
+    if(!f.length)return;const q=f[0];if(POP)POP.remove();POP=new maplibregl.Popup({maxWidth:"320px",offset:10}).setLngLat(q.geometry.coordinates).setHTML(popStop(q.properties.name)).addTo(MAP)}catch(er){diag("Errore al tocco: "+(er.message||er))}})}
+  PRONTA=true;drawMap()
+ }catch(er){diag("Errore strati mappa: "+(er.message||er))}}
 class Ctl3D{onAdd(m){const d=document.createElement("div");d.className="maplibregl-ctrl maplibregl-ctrl-group";const b=document.createElement("button");b.type="button";b.textContent="3D";b.style.cssText="font-weight:700;width:29px;height:29px";
  b.onclick=()=>{const p=m.getPitch()>10;m.easeTo({pitch:p?0:60,bearing:p?0:-20,duration:700})};d.appendChild(b);this.d=d;return d}onRemove(){this.d.remove()}}
 function mapErr(t,d){$("#map").innerHTML=`<div style="padding:90px 24px;text-align:center"><p>${t}</p><p class="mute" style="font-size:12px">${esc(d||"")}</p></div>`}
@@ -196,7 +204,7 @@ function initMap(){
   MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true}});
   MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
   MAP.addControl(new Ctl3D(),"top-right");
-  MAP.on("style.load",assicura);MAP.on("styledata",assicura);
+  MAP.on("style.load",assicura);
   MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
  }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
 let SEG=null;

@@ -123,9 +123,9 @@ function prepara(){IDX={};ATT.forEach(l=>l.f.forEach(st=>(IDX[st[0]]=IDX[st[0]]|
  nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 let tab="",USER=null,drawId=0;const RC={};
 const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario"};
-function dep(l,tt,sub){return `<div class="row" data-map="${ATT.indexOf(l)}"><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}</div><div class="mute">${sub||"da "+esc(inizio(l))}</div></div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}</div>${tt.length>1?`<div class="alt">${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div>`}
+function dep(l,tt,sub,seg){return `<div class="row" data-map="${ATT.indexOf(l)}"${seg?` data-seg="${seg}"`:""}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}</div><div class="mute">${sub||"da "+esc(inizio(l))}</div></div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}</div>${tt.length>1?`<div class="alt">${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div>`}
 function righe(n,max){const r=(IDX[n]||[]).map(([l,t])=>[l,dopo(t,4).map(x=>x[0])]).sort((a,b)=>(a[1][0]?mins(a[1][0]):9999)-(b[1][0]?mins(b[1][0]):9999));
- return (max?r.slice(0,max):r).map(([l,t])=>dep(l,t)).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")}
+ return (max?r.slice(0,max):r).map(([l,t])=>dep(l,t)).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Orario).</p>`:"")}
 function vFermata(){
  $("#vista").innerHTML=`<input id="q" list="fermate" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off">${lista}<p class="hint">Tocca una linea per vederne il percorso sulla mappa.</p><div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML='<p class="mute">Scrivi almeno due lettere.</p>';return}
@@ -140,11 +140,13 @@ function vLinea(){
 function vAB(){
  $("#vista").innerHTML=`<input id="da" list="fermate" placeholder="Partenza" autocomplete="off"><label for="a"></label><input id="a" list="fermate" placeholder="Arrivo" autocomplete="off">${lista}<p class="hint">Solo bus diretti, senza cambi. Tocca una linea per il percorso.</p><div id="r"></div>`;
  const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML="";return}
-  let h="";ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
+  let h="",primo=null;ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
    const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k]]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,4);
    const sub=tr.length?`arrivo ${hm(tr[0][1])} · ${mins(tr[0][1])-mins(tr[0][0])} min`:"nessuna corsa dopo quell'ora";
-   h+=`<div class="card">${dep(l,tr.map(x=>x[0]),sub)}</div>`});
-  $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato.</p>'};
+   if(!primo||(tr.length&&!primo[3]))primo=[ATT.indexOf(l),i,j,tr.length>0];
+   h+=`<div class="card">${dep(l,tr.map(x=>x[0]),sub,i+","+j)}<button class="btn" data-map="${ATT.indexOf(l)}" data-seg="${i},${j}">Vedi il tragitto sulla mappa</button></div>`});
+  $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato.</p>';
+  if(primo){mapLine=String(primo[0]);SEG=[primo[1],primo[2]];drawMap()}};
  $("#da").oninput=go;$("#a").oninput=go;go()}
 function vVicino(){
  $("#vista").innerHTML='<p class="mute" id="r">Cerco la tua posizione…</p>';
@@ -182,8 +184,8 @@ function assicura(){if(!MAP||!MAP.isStyleLoaded()||MAP.getSource("linea"))return
  MAP.addLayer({id:"linea-str",type:"line",source:"linea",filter:["==",["get","ind"],0],layout:lay,paint:{"line-color":["get","c"],"line-width":5.5,"line-opacity":.92}});
  MAP.addLayer({id:"fermate",type:"circle",source:"fermate",paint:{"circle-radius":["case",["==",["get","ev"],1],7,5],"circle-color":["case",["==",["get","ev"],1],["get","c"],"#ffffff"],"circle-stroke-color":["get","c"],"circle-stroke-width":2.5}});
  if(!EV){EV=true;
-  MAP.on("click","fermate",e=>{const f=e.features[0];if(POP)POP.remove();POP=new maplibregl.Popup({maxWidth:"300px",offset:10}).setLngLat(f.geometry.coordinates).setHTML(popStop(f.properties.name)).addTo(MAP)});
-  MAP.on("mouseenter","fermate",()=>MAP.getCanvas().style.cursor="pointer");MAP.on("mouseleave","fermate",()=>MAP.getCanvas().style.cursor="")}
+  MAP.on("click",e=>{const r=14,f=MAP.queryRenderedFeatures([[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]],{layers:["fermate"]});
+   if(!f.length)return;const q=f[0];if(POP)POP.remove();POP=new maplibregl.Popup({maxWidth:"300px",offset:10}).setLngLat(q.geometry.coordinates).setHTML(popStop(q.properties.name)).addTo(MAP)})}
  PRONTA=true;drawMap()}
 class Ctl3D{onAdd(m){const d=document.createElement("div");d.className="maplibregl-ctrl maplibregl-ctrl-group";const b=document.createElement("button");b.type="button";b.textContent="3D";b.style.cssText="font-weight:700;width:29px;height:29px";
  b.onclick=()=>{const p=m.getPitch()>10;m.easeTo({pitch:p?0:60,bearing:p?0:-20,duration:700})};d.appendChild(b);this.d=d;return d}onRemove(){this.d.remove()}}
@@ -197,30 +199,33 @@ function initMap(){
   MAP.on("style.load",assicura);MAP.on("styledata",assicura);
   MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
  }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
-async function percorso(l){const k=l.id+"|"+l.dir+"|"+l.tipo;if(k in RC)return RC[k];
- let pts=l.f.map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
+let SEG=null;
+async function percorso(l,i,j){const k=l.id+"|"+l.dir+"|"+l.tipo+"|"+i+"-"+j;if(k in RC)return RC[k];
+ let pts=l.f.slice(i,j+1).map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
  if(pts.length<2)return RC[k]=null;
  if(pts.length>80)pts=pts.filter((p,i)=>i===pts.length-1||i%Math.ceil(pts.length/80)===0);
  try{const r=await fetch("https://router.project-osrm.org/route/v1/driving/"+pts.map(p=>p[1]+","+p[0]).join(";")+"?overview=full&geometries=geojson");
-  const j=await r.json();if(j.routes&&j.routes[0])return RC[k]=j.routes[0].geometry.coordinates}catch(e){}
+  const jj=await r.json();if(jj.routes&&jj.routes[0])return RC[k]=jj.routes[0].geometry.coordinates}catch(e){}
  return null}
 function adatta(pts){if(!pts.length)return;const b=new maplibregl.LngLatBounds(pts[0],pts[0]);pts.forEach(p=>b.extend(p));
- MAP.fitBounds(b,{padding:{top:90,bottom:60,left:30,right:30},duration:600,maxZoom:16})}
+ MAP.fitBounds(b,{padding:{top:90,bottom:tab?Math.round(innerHeight*.62):60,left:30,right:30},duration:600,maxZoom:16})}
 async function drawMap(){
  if(!MAP||!PRONTA)return;const my=++drawId,chip=$("#chip");
  if(!Object.keys(COORD).length){chip.hidden=false;chip.innerHTML='<span class="mute">Posizioni delle fermate non ancora pronte. Usa il menu in basso per gli orari.</span>';setDati([],[]);return}
  if(mapLine===""){chip.hidden=true;setDati(Object.keys(IDX).filter(n=>COORD[n]).map(n=>pt(n,false)),[]);return}
- const l=ATT[mapLine],c=col(l.id),m=l.f.filter(x=>!COORD[x[0]]).length;
- const stops=l.f.filter(x=>COORD[x[0]]).map(x=>pt(x[0],true,c)),pts=stops.map(f=>f.geometry.coordinates);
+ const l=ATT[mapLine],c=col(l.id),i0=SEG?SEG[0]:0,j0=SEG?SEG[1]:l.f.length-1;
+ const parte=l.f.slice(i0,j0+1),m=parte.filter(x=>!COORD[x[0]]).length;
+ const stops=parte.filter(x=>COORD[x[0]]).map(x=>pt(x[0],true,c)),pts=stops.map(f=>f.geometry.coordinates);
  const riga=(g,ind)=>[{type:"Feature",properties:{c,ind},geometry:{type:"LineString",coordinates:g}}];
  setDati(stops,riga(pts,1));adatta(pts);
- chip.hidden=false;chip.innerHTML=`${badge(l)}<span>verso ${esc(fine(l))}<br><span class="mute" id="rs">Calcolo il percorso…</span></span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
- $("#x").onclick=()=>{mapLine="";drawMap()};
- const g=await percorso(l);if(my!==drawId)return;
+ const titolo=SEG?`da ${esc(l.f[i0][0])} a ${esc(l.f[j0][0])}`:`verso ${esc(fine(l))}`;
+ chip.hidden=false;chip.innerHTML=`${badge(l)}<span>${titolo}<br><span class="mute" id="rs">Calcolo il percorso…</span></span><button id="x" aria-label="Togli evidenziazione">✕</button>`;
+ $("#x").onclick=()=>{mapLine="";SEG=null;drawMap()};
+ const g=await percorso(l,i0,j0);if(my!==drawId)return;
  if(g)setDati(stops,riga(g,0));
  $("#rs").textContent=(g?"Percorso sulle strade":"Percorso indicativo")+(m?` · ${m} fermate senza posizione`:"")}
 document.addEventListener("click",e=>{if(e.target.closest("a"))return;const b=e.target.closest("[data-map]");
- if(b){mapLine=b.dataset.map;tab="";render();if(POP)POP.remove();drawMap()}});
+ if(b){mapLine=b.dataset.map;SEG=b.dataset.seg?b.dataset.seg.split(",").map(Number):null;tab="";render();if(POP)POP.remove();drawMap()}});
 document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
 $("#chiudi").onclick=()=>{tab="";render()};
 $("#ora").addEventListener("input",()=>{oraManuale=true});

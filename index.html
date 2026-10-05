@@ -80,6 +80,12 @@ h3{margin:0 0 4px;font-size:17px}
 .star{color:#e0a100}
 label.chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:15px}
 label.chk input{width:auto}
+.orario .dep{gap:12px}
+.orario .tt{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;min-width:86px;line-height:1}
+.orario.past{opacity:.55}
+.row.prossima{border-left:4px solid var(--acc);padding-left:8px;background:linear-gradient(90deg,rgba(14,110,126,.10),transparent)}
+.orario .next small{font-size:13px}
+#lpass[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -164,14 +170,21 @@ function vFermata(){
   const nm=nomi.filter(n=>has(n,q)).sort((a,b)=>a.length-b.length).slice(0,8);
   $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)}</h3>${righe(n,0,60)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
  $("#q").oninput=go;go()}
-const chipsOrari=(l,i,base)=>{const ts=l.f[i][1].map((t,k)=>[t,k]).filter(x=>x[0]),nx=ts.find(x=>mins(x[0])>=base);
- return {ts,nx,html:ts.map(([t,k])=>`<button class="chip${mins(t)<base?" past":""}${nx&&k===nx[1]?" next":""}" data-map="${ATT.indexOf(l)}" data-seg="${i},${l.f.length-1}" data-k="${k}">${hm(t)}</button>`).join("")}};
+const listaOrari=(l,i,base)=>{const ts=l.f[i][1].map((t,k)=>[t,k]).filter(x=>x[0]),nx=ts.find(x=>mins(x[0])>=base);
+ const riga=([t,k],p)=>{let t1=null;for(let q=l.f.length-1;q>i;q--){const v=l.f[q][1][k];if(v){t1=v;break}}
+  let d=t1?mins(t1)-mins(t):0;if(d<0)d+=1440;
+  return `<div class="row orario${p?" past":""}${nx&&k===nx[1]?" prossima":""}" data-map="${ATT.indexOf(l)}" data-seg="${i},${l.f.length-1}" data-k="${k}"><div class="dep"><div class="tt">${hm(t)}</div><div class="mid"><div class="mute">${t1&&d>0?`arriva ${hm(t1)} · ${d} min`:"corsa breve"}</div></div><div class="next"><small>${p?"già passata":tra(t)}</small></div></div></div>`};
+ const pas=ts.filter(x=>mins(x[0])<base),fut=ts.filter(x=>mins(x[0])>=base);
+ const html=(pas.length?`<button class="btn" id="passate" data-n="${pas.length}">Corse già passate (${pas.length})</button><div id="lpass" hidden>${pas.map(x=>riga(x,true)).join("")}</div>`:"")+(fut.map(x=>riga(x,false)).join("")||'<p class="mute">Nessun’altra corsa oggi.</p>');
+ return {ts,nx,html}};
+function attivaPassate(){const b=$("#passate");if(b)b.onclick=()=>{const p=$("#lpass");p.hidden=!p.hidden;b.textContent=p.hidden?`Corse già passate (${b.dataset.n})`:"Nascondi le corse già passate"};
+ const n=$("#vista .row.prossima");if(n&&n.scrollIntoView)n.scrollIntoView({block:"nearest"})}
 function vLinea(){
  const ord=ATT.map((l,i)=>i).sort((a,b)=>(isPref(ATT[b])-isPref(ATT[a]))||ATT[a].id.localeCompare(ATT[b].id,"it",{numeric:true}));
  $("#vista").innerHTML=`<select id="sl">${ord.map(i=>`<option value="${i}">${isPref(ATT[i])?"★ ":""}${esc(ATT[i].id)} · verso ${esc(fine(ATT[i]))}</option>`).join("")}</select><label for="sf">Da quale fermata</label><select id="sf"></select><div id="r"></div>`;
- const show=()=>{const l=ATT[$("#sl").value],i=+$("#sf").value,c=chipsOrari(l,i,dalle());
-  $("#r").innerHTML=`<div class="dep" style="margin:12px 0 4px">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">${c.ts.length} corse oggi · ${c.nx?"prossima "+hm(c.nx[0])+" "+tra(c.nx[0]):"nessuna altra"}</div></div></div><div class="chips">${c.html}</div><button class="btn" data-map="${$("#sl").value}" data-seg="${i},${l.f.length-1}">Mostra il percorso</button>`;
-  const n=$("#r .chip.next");if(n)n.scrollIntoView({block:"nearest"})};
+ const show=()=>{const l=ATT[$("#sl").value],i=+$("#sf").value,c=listaOrari(l,i,dalle());
+  $("#r").innerHTML=`<div class="dep" style="margin:12px 0 4px">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">${c.ts.length} corse oggi · ${c.nx?"prossima "+hm(c.nx[0])+" "+tra(c.nx[0]):"nessuna altra"}</div></div></div>${c.html}<button class="btn" data-map="${$("#sl").value}" data-seg="${i},${l.f.length-1}">Mostra il percorso intero</button>`;
+  attivaPassate()};
  const fill=()=>{const l=ATT[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
  $("#sl").onchange=fill;$("#sf").onchange=show;fill()}
 function vAB(){
@@ -201,10 +214,10 @@ function vStop(){
  $("#vista").innerHTML=righe(STOP,0,STOPWIN)+`<button class="btn" id="piu">${STOPWIN>60?"Solo la prossima ora":"Mostra anche i successivi"}</button>`;
  $("#piu").onclick=()=>{STOPWIN=STOPWIN>60?60:240;vStop()}}
 let OR=null;
-function vOrari(){const l=ATT[OR.l],i=OR.i,s=l.f[i],c=chipsOrari(l,i,dalle());
- $("#vista").innerHTML=`<button class="back" id="back">‹ Indietro</button><div class="dep" style="margin:6px 0">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">da ${esc(s[0])}${c.nx?" · prossimo "+hm(c.nx[0])+" "+tra(c.nx[0]):""}</div></div></div><div class="chips">${c.html}</div><p class="hint">Tocca un orario per vedere il percorso sulla mappa.</p>`;
+function vOrari(){const l=ATT[OR.l],i=OR.i,s=l.f[i],c=listaOrari(l,i,dalle());
+ $("#vista").innerHTML=`<button class="back" id="back">‹ Indietro</button><div class="dep" style="margin:6px 0">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">da ${esc(s[0])}${c.nx?" · prossimo "+hm(c.nx[0])+" "+tra(c.nx[0]):""}</div></div></div>${c.html}<p class="hint">Tocca una corsa per vedere il percorso sulla mappa.</p>`;
  $("#back").onclick=()=>{STOP=OR.stop;tab=OR.back;render()};
- const n=$("#vista .chip.next");if(n)n.scrollIntoView({block:"center"})}
+ attivaPassate()}
 function lockMap(on){if(!MAP)return;["dragPan","scrollZoom","touchZoomRotate","doubleClickZoom","dragRotate","touchPitch","boxZoom","keyboard"].forEach(h=>{try{MAP[h][on?"disable":"enable"]()}catch(e){}})}
 let ULTIMO="";
 function vImpPrefs(){const ids=[...new Set(ATT.map(l=>l.id))].sort((a,b)=>a.localeCompare(b,"it",{numeric:true}));

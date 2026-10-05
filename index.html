@@ -73,6 +73,13 @@ h3{margin:0 0 4px;font-size:17px}
 .warnico{color:var(--warn);font-size:14px}
 #bar svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 #sheet{overscroll-behavior:contain}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.chip{padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-weight:600;font-variant-numeric:tabular-nums}
+.chip.past{opacity:.4}.chip.next,.chip.sel{background:var(--acc);color:var(--on);border-color:var(--acc)}
+.back{border:0;background:none;color:var(--acc);font:inherit;font-weight:600;padding:2px 0}
+.star{color:#e0a100}
+label.chk{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:15px}
+label.chk input{width:auto}
 </style>
 </head>
 <body>
@@ -83,12 +90,12 @@ h3{margin:0 0 4px;font-size:17px}
 <button data-k="fermata"><svg viewBox="0 0 24 24"><path d="M12 21s7-6.2 7-11a7 7 0 10-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.5"/></svg>Fermata</button>
 <button data-k="linea"><svg viewBox="0 0 24 24"><path d="M8 6v6M15 6v6M2 12h19.6"/><path d="M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 00-2 2v10h3"/><circle cx="7" cy="18" r="2"/><path d="M9 18h5"/><circle cx="16" cy="18" r="2"/></svg>Linea</button>
 <button data-k="ab"><svg viewBox="0 0 24 24"><path d="M8 3L4 7l4 4M4 7h16M16 21l4-4-4-4M20 17H4"/></svg>Da A a B</button>
-<button data-k="imp"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Orario</button>
+<button data-k="imp"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>Profilo</button>
 </nav>
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Da che ora</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><p class="hint" id="diag"></p><p class="hint">Per gli edifici in 3D scegli Standard e tocca il pulsante 3D sulla mappa (si inclina anche con due dita).</p></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><p class="hint" id="diag"></p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Chiudi</button></dialog>
@@ -138,26 +145,33 @@ let nomi=[],lista="",IDX={};
 function prepara(){IDX={};ATT.forEach(l=>l.f.forEach((st,i)=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1],i])));
  nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 let tab="",USER=null,drawId=0;const RC={};
-const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Orario",stop:""};
-function dep(l,tt,sub,seg,k,vis){
+const TIT={fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Impostazioni",stop:"",orari:""};
+let PREF=[],LEGG=false;try{PREF=JSON.parse(localStorage.getItem("pref")||"[]");LEGG=localStorage.getItem("legg")==="1"}catch(e){}
+const isPref=l=>PREF.includes(l.id);
+function dep(l,tt,sub,seg,k,vis,open){
  const w=DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*"));
- return `<div class="row" data-map="${ATT.indexOf(l)}"${seg?` data-seg="${seg}"`:""}${k!=null?` data-k="${k}"`:""}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${esc(fine(l))}${w?' <span class="warnico">⚠</span>':""}</div>${vis&&sub?`<div class="mute">${sub}</div>`:""}</div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}<button class="chev" aria-label="Dettagli">⌄</button></div><div class="det" hidden><div class="mute">da ${esc(inizio(l))}${!vis&&sub?" · "+sub:""}</div>${tt.length>1?`<div class="alt">Poi: ${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div></div>`}
+ const at=open?`data-open="${open}"`:`data-map="${ATT.indexOf(l)}"${seg?` data-seg="${seg}"`:""}${k!=null?` data-k="${k}"`:""}`;
+ return `<div class="row" ${at}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${isPref(l)?'<span class="star">★</span> ':""}${esc(fine(l))}${w?' <span class="warnico">⚠</span>':""}</div>${vis&&sub?`<div class="mute">${sub}</div>`:""}</div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b><small>${tra(tt[0])}</small></div>`:'<div class="next mute">—</div>'}<button class="chev" aria-label="Dettagli">⌄</button></div><div class="det" hidden><div class="mute">da ${esc(inizio(l))}${!vis&&sub?" · "+sub:""}</div>${tt.length>1?`<div class="alt">Poi: ${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div></div>`}
 function righe(n,max,win){const base=dalle();
  let r=(IDX[n]||[]).map(([l,t,i])=>[l,t.map((x,k)=>[x,k]).filter(([x])=>x&&mins(x)>=base&&(!win||mins(x)<=base+win)).slice(0,win?10:4),i]);
  if(win){r=r.filter(x=>x[1].length);if(!r.length)return `<p class="hint">Nessun bus nell'ora successiva alle ${esc($("#ora").value)}. Ecco i prossimi:</p>`+righe(n,max)}
- r.sort((a,b)=>(a[1][0]?mins(a[1][0][0]):9999)-(b[1][0]?mins(b[1][0][0]):9999));
- const card=([l,p,i])=>dep(l,p.map(x=>x[0]),undefined,i+","+(l.f.length-1),p.length?p[0][1]:null);
- return (max?r.slice(0,max):r).map(card).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Orario).</p>`:"")}
+ r.sort((a,b)=>(isPref(b[0])-isPref(a[0]))||((a[1][0]?mins(a[1][0][0]):9999)-(b[1][0]?mins(b[1][0][0]):9999)));
+ const card=([l,p,i])=>dep(l,p.map(x=>x[0]),undefined,undefined,null,false,ATT.indexOf(l)+","+i);
+ return (max?r.slice(0,max):r).map(card).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Profilo).</p>`:"")}
 function vFermata(){
  $("#vista").innerHTML=`<input id="q" list="fermate" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off">${lista}<div id="r"></div>`;
  const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML="";return}
   const nm=nomi.filter(n=>has(n,q)).sort((a,b)=>a.length-b.length).slice(0,8);
   $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)}</h3>${righe(n,0,60)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
  $("#q").oninput=go;go()}
+const chipsOrari=(l,i,base)=>{const ts=l.f[i][1].map((t,k)=>[t,k]).filter(x=>x[0]),nx=ts.find(x=>mins(x[0])>=base);
+ return {ts,nx,html:ts.map(([t,k])=>`<button class="chip${mins(t)<base?" past":""}${nx&&k===nx[1]?" next":""}" data-map="${ATT.indexOf(l)}" data-seg="${i},${l.f.length-1}" data-k="${k}">${hm(t)}</button>`).join("")}};
 function vLinea(){
- $("#vista").innerHTML=`<select id="sl">${ATT.map((l,i)=>`<option value="${i}">${esc(l.id)} · verso ${esc(fine(l))}</option>`).join("")}</select><label for="sf">Da quale fermata</label><select id="sf"></select><div id="r"></div>`;
- const show=()=>{const l=ATT[$("#sl").value],i=+$("#sf").value,s=l.f[i],d=dopo(s[1],6);
-  $("#r").innerHTML=`<div class="card">${dep(l,d.map(x=>x[0]),esc(s[0]),i+","+(l.f.length-1),d.length?d[0][1]:null,true)}</div>`};
+ const ord=ATT.map((l,i)=>i).sort((a,b)=>(isPref(ATT[b])-isPref(ATT[a]))||ATT[a].id.localeCompare(ATT[b].id,"it",{numeric:true}));
+ $("#vista").innerHTML=`<select id="sl">${ord.map(i=>`<option value="${i}">${isPref(ATT[i])?"★ ":""}${esc(ATT[i].id)} · verso ${esc(fine(ATT[i]))}</option>`).join("")}</select><label for="sf">Da quale fermata</label><select id="sf"></select><div id="r"></div>`;
+ const show=()=>{const l=ATT[$("#sl").value],i=+$("#sf").value,c=chipsOrari(l,i,dalle());
+  $("#r").innerHTML=`<div class="dep" style="margin:12px 0 4px">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">${c.ts.length} corse oggi · ${c.nx?"prossima "+hm(c.nx[0])+" "+tra(c.nx[0]):"nessuna altra"}</div></div></div><div class="chips">${c.html}</div><button class="btn" data-map="${$("#sl").value}" data-seg="${i},${l.f.length-1}">Mostra il percorso</button>`;
+  const n=$("#r .chip.next");if(n)n.scrollIntoView({block:"nearest"})};
  const fill=()=>{const l=ATT[$("#sl").value];$("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");show()};
  $("#sl").onchange=fill;$("#sf").onchange=show;fill()}
 function vAB(){
@@ -186,17 +200,24 @@ let STOP="",STOPWIN=60;
 function vStop(){
  $("#vista").innerHTML=righe(STOP,0,STOPWIN)+`<button class="btn" id="piu">${STOPWIN>60?"Solo la prossima ora":"Mostra anche i successivi"}</button>`;
  $("#piu").onclick=()=>{STOPWIN=STOPWIN>60?60:240;vStop()}}
+let OR=null;
+function vOrari(){const l=ATT[OR.l],i=OR.i,s=l.f[i],c=chipsOrari(l,i,dalle());
+ $("#vista").innerHTML=`<button class="back" id="back">‹ Indietro</button><div class="dep" style="margin:6px 0">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}</div><div class="mute">da ${esc(s[0])}${c.nx?" · prossimo "+hm(c.nx[0])+" "+tra(c.nx[0]):""}</div></div></div><div class="chips">${c.html}</div><p class="hint">Tocca un orario per vedere il percorso sulla mappa.</p>`;
+ $("#back").onclick=()=>{STOP=OR.stop;tab=OR.back;render()};
+ const n=$("#vista .chip.next");if(n)n.scrollIntoView({block:"center"})}
 function lockMap(on){if(!MAP)return;["dragPan","scrollZoom","touchZoomRotate","doubleClickZoom","dragRotate","touchPitch","boxZoom","keyboard"].forEach(h=>{try{MAP[h][on?"disable":"enable"]()}catch(e){}})}
 let ULTIMO="";
+function vImpPrefs(){const ids=[...new Set(ATT.map(l=>l.id))].sort((a,b)=>a.localeCompare(b,"it",{numeric:true}));
+ $("#prefs").innerHTML=ids.map(id=>`<button class="chip${PREF.includes(id)?" sel":""}" data-pref="${esc(id)}">${esc(id)}</button>`).join("")}
 function render(){
  if(!oraManuale)setOra();
  $("#sheet").hidden=!tab;lockMap(!!tab);
  document.querySelectorAll("#bar button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.k===tab));
  if(!tab){ULTIMO="";return}
- const chiave=tab+"|"+STOP;if(chiave!==ULTIMO){$("#sheet").scrollTop=0;ULTIMO=chiave}
- $("#stit").textContent=tab==="stop"?STOP:TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
- if(tab==="imp")return;
- ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino,stop:vStop})[tab]()}
+ const chiave=tab+"|"+STOP+"|"+(OR?OR.l+"-"+OR.i:"");if(chiave!==ULTIMO){$("#sheet").scrollTop=0;ULTIMO=chiave}
+ $("#stit").textContent=tab==="stop"?STOP:tab==="orari"?"Linea "+ATT[OR.l].id:TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
+ if(tab==="imp"){vImpPrefs();return}
+ ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino,stop:vStop,orari:vOrari})[tab]()}
 function vista(){render()}
 const dist=(a,b,c,d)=>{const p=Math.PI/180,x=Math.sin((c-a)*p/2)**2+Math.cos(a*p)*Math.cos(c*p)*Math.sin((d-b)*p/2)**2;return 12742000*Math.asin(Math.sqrt(x))};
 const STILI={liberty:"https://tiles.openfreemap.org/styles/liberty",positron:"https://tiles.openfreemap.org/styles/positron",dark:"https://tiles.openfreemap.org/styles/dark",bright:"https://tiles.openfreemap.org/styles/bright"};
@@ -213,8 +234,18 @@ function icona(c){const nome="f"+c.replace(/[^a-z0-9]/gi,"");if(MAP.hasImage(nom
  x.fillStyle=c;rr(x,22,19,20,10,2);x.fill();x.fillRect(24,33,4,3);x.fillRect(36,33,4,3);
  x.fillStyle="#fff";x.fillRect(22,40,6,5);x.fillRect(36,40,6,5);
  MAP.addImage(nome,x.getImageData(0,0,s,s),{pixelRatio:2});return nome}
+function iconaNum(c,n){const nome="n"+c.replace(/[^a-z0-9]/gi,"")+"_"+n;if(MAP.hasImage(nome))return nome;
+ const s=64,cv=document.createElement("canvas");cv.width=cv.height=s;const x=cv.getContext("2d");
+ x.shadowColor="rgba(0,0,0,.35)";x.shadowBlur=4;x.shadowOffsetY=1.5;x.fillStyle="#fff";x.beginPath();x.arc(32,31,27,0,7);x.fill();
+ x.shadowColor="transparent";x.fillStyle=c;x.beginPath();x.arc(32,31,23,0,7);x.fill();
+ x.fillStyle="#fff";x.textAlign="center";x.textBaseline="middle";x.font=`700 ${n>99?20:n>9?26:30}px -apple-system,Helvetica,Arial,sans-serif`;x.fillText(String(n),32,33);
+ MAP.addImage(nome,x.getImageData(0,0,s,s),{pixelRatio:2});return nome}
+function iconaFreccia(c){const nome="a"+c.replace(/[^a-z0-9]/gi,"");if(MAP.hasImage(nome))return nome;
+ const s=32,cv=document.createElement("canvas");cv.width=cv.height=s;const x=cv.getContext("2d");
+ x.lineJoin="round";x.lineWidth=3;x.strokeStyle=c;x.fillStyle="#fff";x.beginPath();x.moveTo(8,6);x.lineTo(26,16);x.lineTo(8,26);x.lineTo(13,16);x.closePath();x.stroke();x.fill();
+ MAP.addImage(nome,x.getImageData(0,0,s,s),{pixelRatio:2});return nome}
 const FC=f=>({type:"FeatureCollection",features:f});
-const pt=(n,ev,c)=>{const cc=c||TEAL;return {type:"Feature",properties:{name:n,ev:ev?1:0,c:cc,ic:icona(cc)},geometry:{type:"Point",coordinates:[COORD[n][1],COORD[n][0]]}}};
+const pt=(n,ev,c,num)=>{const cc=c||TEAL;return {type:"Feature",properties:{name:n,ev:ev?1:0,c:cc,ic:num?iconaNum(cc,num):icona(cc)},geometry:{type:"Point",coordinates:[COORD[n][1],COORD[n][0]]}}};
 function setDati(s,l){if(!MAP)return;diag(`Mappa: ${s.length} fermate disegnate`+(l.length?`, linea con ${l[0].geometry.coordinates.length} punti`:"")+`, ${NPOI} livelli fermate-base nascosti`);const a=MAP.getSource("fermate"),b=MAP.getSource("linea");if(a)a.setData(FC(s));if(b)b.setData(FC(l))}
 const diag=t=>{const e=$("#diag");if(e)e.textContent=t};
 function esLegacy(f){if(!Array.isArray(f))return false;const o=f[0];if(["all","any","none"].includes(o))return f.length>1&&esLegacy(f[1]);return["==","!=",">",">=","<","<=","in","!in","has","!has"].includes(o)&&typeof f[1]==="string"}
@@ -228,8 +259,9 @@ function assicura(){if(!MAP||MAP.getSource("linea"))return;
   const lay={"line-cap":"round","line-join":"round"};
   MAP.addLayer({id:"linea-ind",type:"line",source:"linea",filter:["==",["get","ind"],1],layout:lay,paint:{"line-color":["get","c"],"line-width":4,"line-dasharray":[2,2],"line-opacity":.85}});
   MAP.addLayer({id:"linea-str",type:"line",source:"linea",filter:["==",["get","ind"],0],layout:lay,paint:{"line-color":["get","c"],"line-width":5.5,"line-opacity":.92}});
+  MAP.addLayer({id:"linea-frecce",type:"symbol",source:"linea",layout:{"symbol-placement":"line","symbol-spacing":80,"icon-image":["get","fr"],"icon-size":.8,"icon-allow-overlap":true,"icon-ignore-placement":true,"icon-rotation-alignment":"map"}});
   MAP.addLayer({id:"fermate",type:"symbol",source:"fermate",layout:{"icon-image":["get","ic"],"icon-allow-overlap":true,"icon-ignore-placement":true,
-   "icon-size":["interpolate",["linear"],["zoom"],11,["case",["==",["get","ev"],1],.3,.2],15,["case",["==",["get","ev"],1],.62,.46],18,["case",["==",["get","ev"],1],.85,.65]]}});
+   "icon-size":["interpolate",["linear"],["zoom"],11,["case",["==",["get","ev"],1],.34,.2],15,["case",["==",["get","ev"],1],.8,.46],18,["case",["==",["get","ev"],1],1,.65]]}});
   if(!EV){EV=true;
    MAP.on("click",e=>{try{const r=14,f=MAP.queryRenderedFeatures([[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]],{layers:["fermate"]});
     if(!f.length){if(tab==="stop"){tab="";render()}return}
@@ -243,9 +275,9 @@ function mapErr(t,d){$("#map").innerHTML=`<div style="padding:90px 24px;text-ali
 function initMap(){
  if(!window.maplibregl)return mapErr("Non riesco a scaricare la libreria della mappa. Controlla la connessione e ricarica la pagina. Gli orari funzionano dal menu in basso.","libreria mappa non caricata");
  try{
-  MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true}});
+  MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true},pixelRatio:LEGG?1.5:Math.min(window.devicePixelRatio||1,2),fadeDuration:LEGG?0:300});
   MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
-  MAP.addControl(new Ctl3D(),"top-right");
+  if(!LEGG)MAP.addControl(new Ctl3D(),"top-right");
   MAP.on("style.load",assicura);
   MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
  }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
@@ -265,8 +297,8 @@ async function drawMap(){
  if(mapLine===""){chip.hidden=true;setDati(Object.keys(IDX).filter(n=>COORD[n]).map(n=>pt(n,false)),[]);return}
  const l=ATT[mapLine],c=col(l.id),i0=SEG?SEG[0]:0,j0=SEG?SEG[1]:l.f.length-1;
  const parte=l.f.slice(i0,j0+1),m=parte.filter(x=>!COORD[x[0]]).length;
- const stops=parte.filter(x=>COORD[x[0]]).map(x=>pt(x[0],true,c)),pts=stops.map(f=>f.geometry.coordinates);
- const riga=(g,ind)=>[{type:"Feature",properties:{c,ind},geometry:{type:"LineString",coordinates:g}}];
+ let nn=0;const stops=parte.filter(x=>COORD[x[0]]).map(x=>pt(x[0],true,c,++nn)),pts=stops.map(f=>f.geometry.coordinates);
+ const riga=(g,ind)=>[{type:"Feature",properties:{c,ind,fr:iconaFreccia(c)},geometry:{type:"LineString",coordinates:g}}];
  setDati(stops,riga(pts,1));adatta(pts);
  let st="";
  if(TRIP!=null){const t0=l.f[i0][1][TRIP];let t1=null;for(let q=j0;q>=i0;q--){const v=l.f[q][1][TRIP];if(v){t1=v;break}}
@@ -280,12 +312,16 @@ async function drawMap(){
  const note=[g?"":"Percorso indicativo",m?`${m} fermate senza posizione`:""].filter(Boolean).join(" · ");$("#rs").textContent=note}
 document.addEventListener("click",e=>{
  const c=e.target.closest(".chev");if(c){const d=c.closest(".row").querySelector(".det");d.hidden=!d.hidden;c.classList.toggle("open");return}
- if(e.target.closest("a"))return;const b=e.target.closest("[data-map]");
+ if(e.target.closest("a"))return;
+ const p=e.target.closest("[data-pref]");if(p){const id=p.dataset.pref;PREF=PREF.includes(id)?PREF.filter(x=>x!==id):[...PREF,id];try{localStorage.setItem("pref",JSON.stringify(PREF))}catch(er){}vImpPrefs();return}
+ const o=e.target.closest("[data-open]");if(o){const [li,si]=o.dataset.open.split(",").map(Number);OR={l:li,i:si,back:tab,stop:STOP};tab="orari";render();return}
+ const b=e.target.closest("[data-map]");
  if(b){mapLine=b.dataset.map;SEG=b.dataset.seg?b.dataset.seg.split(",").map(Number):null;TRIP=b.dataset.k!=null&&b.dataset.k!==""?+b.dataset.k:null;tab="";render();drawMap()}});
 document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
 $("#chiudi").onclick=()=>{tab="";render()};
 $("#ora").addEventListener("input",()=>{oraManuale=true});
 $("#ora").onchange=vista;
+$("#legg").checked=LEGG;$("#legg").onchange=()=>{try{localStorage.setItem("legg",$("#legg").checked?"1":"0")}catch(e){}location.reload()};
 $("#adesso").onclick=()=>{oraManuale=false;setOra();render()};
 $("#stile").onchange=()=>{try{localStorage.setItem("stile2",$("#stile").value)}catch(e){}if(MAP){PRONTA=false;MAP.setStyle(stileMappa())}};
 try{const v=localStorage.getItem("stile2");$("#stile").value=v&&STILI[v]?v:"auto"}catch(e){}

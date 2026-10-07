@@ -120,7 +120,7 @@ label.chk input{width:auto}
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="fav" hidden aria-label="Fermata preferita">☆</button><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><p class="hint" id="diag"></p></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><label class="chk"><input type="checkbox" id="bus"> Mostra i bus stimati sulla mappa</label><p class="hint">Posizioni stimate dagli orari di tabella, non in tempo reale. Non attivi in modalità leggera.</p><p class="hint" id="diag"></p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Chiudi</button></dialog>
@@ -311,6 +311,11 @@ function assicura(){if(!MAP||MAP.getSource("linea"))return;
   MAP.addLayer({id:"linea-frecce",type:"symbol",source:"linea",layout:{"symbol-placement":"line","symbol-spacing":80,"icon-image":["get","fr"],"icon-size":.8,"icon-allow-overlap":true,"icon-ignore-placement":true,"icon-rotation-alignment":"map"}});
   MAP.addLayer({id:"fermate",type:"symbol",source:"fermate",layout:{"icon-image":["get","ic"],"icon-allow-overlap":true,"icon-ignore-placement":true,
    "icon-size":["interpolate",["linear"],["zoom"],11,["case",["==",["get","ev"],1],.34,.2],15,["case",["==",["get","ev"],1],.8,.46],18,["case",["==",["get","ev"],1],1,.65]]}});
+  if(BUSON){MAP.addSource("bus",{type:"geojson",data:FC([])});
+   const SZ=["interpolate",["exponential",2],["zoom"],14.5,.45,16,.5,19,4],SS=["interpolate",["exponential",2],["zoom"],0,.6,16,.8,19,4.5];
+   const lay=z=>({"icon-image":["get","ic"],"icon-rotate":["get","br"],"icon-rotation-alignment":"map","icon-pitch-alignment":"map","icon-allow-overlap":true,"icon-ignore-placement":true,"icon-size":z});
+   MAP.addLayer({id:"bus",type:"symbol",source:"bus",minzoom:14.5,filter:["==",["get","ev"],0],layout:lay(SZ),paint:{"icon-opacity":["case",["==",["get","dim"],1],.25,["==",["get","w"],1],.75,1]}});
+   MAP.addLayer({id:"bus-sel",type:"symbol",source:"bus",filter:["==",["get","ev"],1],layout:lay(SS)})}
   if(!EV){EV=true;
    MAP.on("click",e=>{try{const r=14,f=MAP.queryRenderedFeatures([[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]],{layers:["fermate"]});
     if(!f.length){if(tab==="stop"){tab="";render()}return}
@@ -331,7 +336,62 @@ function initMap(){
   MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
  }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
 let SEG=null,TRIP=null;
-async function percorso(l,i,j){const k=l.id+"|"+l.dir+"|"+l.tipo+"|"+i+"-"+j;if(k in RC)return RC[k];
+
+// ===== BUS STIMATI DAGLI ORARI =====
+let PERC=null,BUSON=true,BUSZ=false,GEO=new WeakMap(),TRP=new WeakMap();
+try{BUSON=localStorage.getItem("bus")!=="0"&&!LEGG}catch(e){}
+async function caricaPercorsi(){try{const r=await fetch("percorsi.json",{cache:"no-cache"});if(r.ok){PERC=(await r.json()).p||{};GEO=new WeakMap();TRP=new WeakMap()}}catch(e){}}
+const hav=(a,b)=>Math.hypot((a[0]-b[0])*111320*Math.cos((a[1]+b[1])*Math.PI/360),(a[1]-b[1])*110540);
+function riempi(v,fine,ini){const o=v.slice();for(let i=0;i<o.length;i++)if(o[i]==null){let a=i-1;let b=i+1;while(b<v.length&&v[b]==null)b++;
+ const va=a>=0?o[a]:ini,vb=b<v.length?v[b]:fine,ia=a>=0?a:-1,ib=b<v.length?b:v.length;o[i]=va+(vb-va)*(i-ia)/(ib-ia)}return o}
+function geo(l){if(GEO.has(l))return GEO.get(l);let g=null;const r=PERC&&l.rk&&PERC[l.rk];
+ if(r&&r.g&&r.g.length>1&&r.s&&r.s.length===l.f.length&&!l.amb){const P=r.g,cum=[0];for(let i=1;i<P.length;i++)cum.push(cum[i-1]+hav(P[i-1],P[i]));
+  const si=riempi(r.s,P.length-1,0).map(Math.round),sp=riempi(r.s.map(i=>i==null?null:cum[i]),cum[cum.length-1],0);
+  for(let i=1;i<sp.length;i++){sp[i]=Math.max(sp[i],sp[i-1]);si[i]=Math.max(si[i],si[i-1])}
+  g={P,cum,si,sp}}
+ GEO.set(l,g);return g}
+function trips(l){if(TRP.has(l))return TRP.get(l);const g=geo(l),out=[];
+ if(g){const n=l.f[0][1].length;for(let k=0;k<n;k++){const pts=[];let prev=-1,off=0;
+  l.f.forEach((s,q)=>{const t=s[1][k];if(!t)return;let m=mins(t)+off;if(m<prev-720){off+=1440;m+=1440}prev=m;pts.push([g.sp[q],m])});
+  if(pts.length<2)continue;let ok=true;for(let i=1;i<pts.length;i++)if(pts[i][0]<pts[i-1][0]-1||pts[i][1]<pts[i-1][1]-1){ok=false;break}
+  if(ok)out.push({k,pts,t0:pts[0][1],t1:pts[pts.length-1][1]})}}
+ TRP.set(l,out);return out}
+function interp(tr,T){const P=tr.pts;let i=1;while(i<P.length-1&&P[i][1]<=T)i++;const [p0,a]=P[i-1],[p1,b]=P[i];return {st:"r",m:p0+(p1-p0)*(b>a?(T-a)/(b-a):1)}}
+function posAt(tr,T){for(const TT of [T,T+1440]){if(TT<tr.t0-6||TT>tr.t1+1)continue;
+ if(TT<=tr.t0)return {st:"w",m:tr.pts[0][0]};if(TT>=tr.t1)return {st:"f",m:tr.pts[tr.pts.length-1][0]};return interp(tr,TT)}return null}
+function posSel(tr,T){for(const TT of [T,T+1440]){if(TT>=tr.t0-720&&TT<=tr.t1+60){
+ if(TT<=tr.t0)return {st:"w",m:tr.pts[0][0]};if(TT>=tr.t1)return {st:"f",m:tr.pts[tr.pts.length-1][0]};return interp(tr,TT)}}return {st:"w",m:tr.pts[0][0]}}
+function puntoA(g,m){const c=g.cum,P=g.P;let lo=0,hi=c.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(c[mid]<=m)lo=mid;else hi=mid}
+ const f=Math.min(1,Math.max(0,(m-c[lo])/((c[hi]-c[lo])||1))),a=P[lo],b=P[hi];
+ const lon=a[0]+(b[0]-a[0])*f,lat=a[1]+(b[1]-a[1])*f,br=(Math.atan2((b[0]-a[0])*Math.cos(a[1]*Math.PI/180),b[1]-a[1])*180/Math.PI+360)%360;
+ const rad=(br+90)*Math.PI/180;
+ return {c:[lon+3*Math.sin(rad)/(111320*Math.cos(lat*Math.PI/180)),lat+3*Math.cos(rad)/110540],br}}   // 3 m a destra della marcia
+function iconaBus(c){const nome="b"+c.replace(/[^a-z0-9]/gi,"");if(MAP.hasImage(nome))return nome;
+ const w=20,h=64,cv=document.createElement("canvas");cv.width=w;cv.height=h;const x=cv.getContext("2d");
+ x.fillStyle="#fff";rr(x,0,0,w,h,6);x.fill();x.fillStyle=c;rr(x,2,2,w-4,h-4,5);x.fill();
+ x.fillStyle="rgba(255,255,255,.92)";rr(x,4,5,w-8,10,2);x.fill();x.fillStyle="rgba(255,255,255,.35)";rr(x,4,19,w-8,32,2);x.fill();
+ x.fillStyle="rgba(0,0,0,.28)";x.fillRect(4,55,w-8,3);
+ MAP.addImage(nome,x.getImageData(0,0,w,h),{pixelRatio:2});return nome}
+const adessoMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()+d.getSeconds()/60};
+function busFeatures(all){const T=adessoMin(),b=all?MAP.getBounds():null,out=[];
+ ATT.forEach((l,li)=>{const g=geo(l);if(!g)return;const sel=mapLine!==""&&+mapLine===li;if(!all&&!(sel&&TRIP!=null))return;
+  for(const tr of trips(l)){const isSel=sel&&TRIP===tr.k;if(!all&&!isSel)continue;
+   const p=isSel?posSel(tr,T):posAt(tr,T);if(!p)continue;const q=puntoA(g,p.m);if(all&&!isSel&&!b.contains(q.c))continue;
+   out.push({type:"Feature",properties:{ic:iconaBus(col(l.id)),br:q.br,w:p.st==="w"?1:0,ev:sel&&(TRIP==null||isSel)?1:0,dim:mapLine!==""&&!sel?1:0},geometry:{type:"Point",coordinates:q.c}})}});
+ return out}
+function aggiornaStato(){const e=$("#bst");if(!e||mapLine===""||TRIP==null)return;const l=ATT[mapLine],g=geo(l);if(!g){e.textContent="";return}
+ const tr=trips(l).find(t=>t.k===TRIP);if(!tr){e.textContent="";return}
+ const p=posSel(tr,adessoMin()),i0=SEG?SEG[0]:0,tS=l.f[i0][1][TRIP],t0=(l.f.find(s=>s[1][TRIP])||[0,[]])[1][TRIP];let t;
+ if(p.st==="w")t=`Il bus è fermo al capolinea e parte alle ${hm(t0)}.`;else if(p.st==="f")t="Corsa terminata.";
+ else if(p.m<g.sp[i0]-30)t=tS?`Il bus è in viaggio: arriva qui alle ${hm(tS)}.`:"Il bus è in viaggio.";else t="Il bus ha già passato questa fermata.";
+ e.textContent=t+" Posizione stimata dagli orari."}
+function tickBus(){if(!BUSON||!MAP||!PRONTA||!PERC||document.hidden)return;const s=MAP.getSource("bus");if(!s)return;
+ const sel=mapLine!==""&&TRIP!=null;if(tab&&!sel)return;const all=MAP.getZoom()>=14.5;
+ if(!all&&!sel){if(BUSZ){s.setData(FC([]));BUSZ=false}return}
+ const f=busFeatures(all);s.setData(FC(f));BUSZ=f.length>0;aggiornaStato()}
+setInterval(tickBus,300);
+async function percorso(l,i,j){const G=geo(l),k=l.id+"|"+l.dir+"|"+l.tipo+"|"+i+"-"+j+(G?"|s":"");if(k in RC)return RC[k];
+ if(G){const a=G.si[i],b=G.si[j];if(b>a)return RC[k]=G.P.slice(a,b+1)}
  let pts=l.f.slice(i,j+1).map(x=>COORD[x[0]]).filter(Boolean).filter((p,i,a)=>i===0||p[0]!==a[i-1][0]||p[1]!==a[i-1][1]);
  if(pts.length<2)return RC[k]=null;
  if(pts.length>80)pts=pts.filter((p,i)=>i===pts.length-1||i%Math.ceil(pts.length/80)===0);
@@ -354,7 +414,7 @@ async function drawMap(){
   if(t0&&t1){let d=mins(t1)-mins(t0);if(d<0)d+=1440;const tt=tra(t0);
    st=`<div class="stats"><div><small>Partenza</small><b>${hm(t0)}</b>${tt?`<em>${tt}</em>`:""}</div><div><small>Durata</small><b>${d} min</b></div><div><small>Arrivo</small><b>${hm(t1)}</b></div><div><small>Ora</small><b>${new Date().toTimeString().slice(0,5)}</b></div></div>`}}
  const titolo=SEG?`da ${esc(l.f[i0][0])} a ${esc(l.f[j0][0])}`:`verso ${esc(fine(l))}`;
- chip.hidden=false;chip.innerHTML=`<div class="chiprow">${badge(l)}<span class="ct">${titolo}</span><button id="x" aria-label="Chiudi">✕</button></div>${st}<div class="mute" id="rs" style="font-size:12px"></div>`;
+ chip.hidden=false;chip.innerHTML=`<div class="chiprow">${badge(l)}<span class="ct">${titolo}</span><button id="x" aria-label="Chiudi">✕</button></div>${st}${TRIP!=null?'<div class="mute" id="bst" style="font-size:12px;margin-top:4px"></div>':""}<div class="mute" id="rs" style="font-size:12px"></div>`;aggiornaStato();
  $("#x").onclick=()=>{mapLine="";SEG=null;TRIP=null;drawMap()};
  const g=await percorso(l,i0,j0);if(my!==drawId)return;
  if(g)setDati(stops,riga(g,0));
@@ -373,6 +433,7 @@ $("#fav").onclick=()=>{toggleFS(STOP);render()};
 $("#chiudi").onclick=()=>{tab="";render()};
 $("#ora").addEventListener("input",()=>{oraManuale=true});
 $("#ora").onchange=vista;
+$("#bus").checked=BUSON;$("#bus").onchange=()=>{try{localStorage.setItem("bus",$("#bus").checked?"1":"0")}catch(e){}location.reload()};
 $("#legg").checked=LEGG;$("#legg").onchange=()=>{try{localStorage.setItem("legg",$("#legg").checked?"1":"0")}catch(e){}location.reload()};
 $("#adesso").onclick=()=>{oraManuale=false;setOra();render()};
 $("#stile").onchange=()=>{try{localStorage.setItem("stile2",$("#stile").value)}catch(e){}if(MAP){PRONTA=false;MAP.setStyle(stileMappa())}};
@@ -396,7 +457,7 @@ async function carica(){
  const tipi=[...new Set(DATA.linee.map(l=>l.tipo))];
  $("#per").innerHTML=tipi.map(t=>`<option>${esc(t)}</option>`).join("");$("#per").value=indovina(tipi);$("#per").onchange=applica;
  $("#ok").onclick=()=>$("#pop").close();
- applica();popup()}
+ applica();popup();caricaPercorsi().then(()=>{if(PRONTA)drawMap()})}
 carica();
 setInterval(()=>{if(!oraManuale)setOra();homeAggiorna()},30000);
 if("serviceWorker" in navigator)addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));

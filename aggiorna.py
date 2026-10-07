@@ -330,8 +330,11 @@ def blocco_a_linea(b, lab, report):
     seg = [s.strip() for s in b["hdr"].split(" - ") if s.strip()]
     verso = "%s → %s" % (seg[0], seg[-1]) if len(seg) > 1 else b["hdr"]
     verso = re.sub(r"\s*\(?Orario.*$", "", verso).strip(" -")
-    return {"id": b["id"], "dir": verso, "tipo": lab,
-            "f": [[k[0], [v.get(k) for v in viaggi]] for k in ordine]}
+    out = {"id": b["id"], "dir": verso, "tipo": lab,
+           "f": [[k[0], [v.get(k) for v in viaggi]] for k in ordine]}
+    if storte:
+        out["amb"] = 1
+    return out
 
 
 def mins_(t):
@@ -509,6 +512,139 @@ def aggiorna_fermate(dati, report):
         report.append("  senza posizione (%d): %s" % (len(senza), "; ".join(senza[:90])))
 
 
+# ====================== PERCORSI SU STRADA (per i bus stimati) ======================
+import hashlib
+
+MAX_RICHIESTE_PERC = 260
+UA_GEO = "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"
+
+
+def chiave_perc(nomi):
+    return hashlib.md5("\x1f".join(nomi).encode("utf-8")).hexdigest()[:10]
+
+
+def dist_m(a, b):
+    """a e b sono (lon, lat). Distanza approssimata in metri."""
+    kx = 111320 * math.cos(math.radians((a[1] + b[1]) / 2))
+    return math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * 110540)
+
+
+def osrm_percorso(coords):
+    url = "https://router.project-osrm.org/route/v1/driving/" + ";".join("%.6f,%.6f" % c for c in coords) + \
+          "?overview=full&geometries=geojson&continue_straight=true"
+    req = urllib.request.Request(url, headers={"User-Agent": UA_GEO})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        j = json.loads(r.read().decode("utf-8"))
+    if j.get("code") != "Ok":
+        raise RuntimeError("OSRM: %s" % j.get("code"))
+    return j["routes"][0]["geometry"]["coordinates"]
+
+
+def percorso_completo(coords, chiamate):
+    """Percorso su strada passante per tutte le fermate (a blocchi di 80 punti)."""
+    out = []
+    for i in range(0, len(coords) - 1, 79):
+        chiamate[0] += 1
+        time.sleep(1.1)
+        g = osrm_percorso(coords[i:i + 80])
+        out += g if not out else g[1:]
+    return out
+
+
+def mappa_fermate(P, fermate):
+    """Per ogni fermata (lon,lat) o None, indice del vertice di P piu' vicino, in ordine crescente."""
+    cum = [0.0]
+    for i in range(1, len(P)):
+        cum.append(cum[-1] + dist_m(P[i - 1], P[i]))
+    out, start, prec = [], 0, None
+    for s in fermate:
+        if s is None:
+            out.append(None)
+            continue
+        lim = 1500 if prec is None else 3 * dist_m(prec, s) + 800
+        best = None
+        for i in range(start, len(P)):
+            d = dist_m(P[i], s)
+            if best is None or d < best[0]:
+                best = (d, i)
+            if cum[i] - cum[start] > lim:
+                break
+        out.append(best[1])
+        start, prec = best[1], s
+    return out
+
+
+def semplifica(P, tieni, tol=3.0):
+    """Douglas-Peucker (metri) mantenendo i vertici in 'tieni'. Ritorna (punti, mappa vecchio->nuovo indice)."""
+    n = len(P)
+    keep = [False] * n
+    keep[0] = keep[n - 1] = True
+    for i in tieni:
+        keep[i] = True
+    forti = [i for i in range(n) if keep[i]]
+    kx = 111320 * math.cos(math.radians(P[0][1]))
+    xy = [((p[0] - P[0][0]) * kx, (p[1] - P[0][1]) * 110540) for p in P]
+    for a, b in zip(forti, forti[1:]):
+        pila = [(a, b)]
+        while pila:
+            i, j = pila.pop()
+            if j - i < 2:
+                continue
+            (x1, y1), (x2, y2) = xy[i], xy[j]
+            dx, dy = x2 - x1, y2 - y1
+            L = math.hypot(dx, dy) or 1e-9
+            mx, mi = -1, None
+            for k in range(i + 1, j):
+                d = abs(dy * xy[k][0] - dx * xy[k][1] + x2 * y1 - y2 * x1) / L
+                if d > mx:
+                    mx, mi = d, k
+            if mx > tol:
+                keep[mi] = True
+                pila += [(i, mi), (mi, j)]
+    nuovi, mappa = [], {}
+    for i in range(n):
+        if keep[i]:
+            mappa[i] = len(nuovi)
+            nuovi.append([round(P[i][0], 5), round(P[i][1], 5)])
+    return nuovi, mappa
+
+
+def aggiorna_percorsi(dati, report):
+    try:
+        prec = json.load(open("percorsi.json", encoding="utf-8")).get("p", {})
+    except Exception:
+        prec = {}
+    coord = dati.get("fermate", {})
+    perc, usate, chiamate, errori, nuovi = {}, set(), [0], 0, 0
+    for l in dati["linee"]:
+        nomi = [st[0] for st in l["f"]]
+        k = chiave_perc(nomi)
+        l["rk"] = k
+        usate.add(k)
+        if k in prec:
+            perc[k] = prec[k]
+            continue
+        if k in perc or chiamate[0] >= MAX_RICHIESTE_PERC or errori >= 5 or l.get("amb"):
+            continue
+        ll = [tuple(coord[n][::-1]) if coord.get(n) else None for n in nomi]
+        pts = [p for i, p in enumerate(ll) if p and (i == 0 or p != ll[i - 1])]
+        if len(pts) < 2:
+            continue
+        try:
+            P = percorso_completo(pts, chiamate)
+            idx = mappa_fermate(P, ll)
+            nuove_p, m = semplifica(P, [i for i in idx if i is not None])
+            perc[k] = {"g": nuove_p, "s": [m[i] if i is not None else None for i in idx]}
+            nuovi += 1
+        except Exception as e:
+            errori += 1
+            report.append("  percorso non riuscito per linea %s: %s" % (l["id"], e))
+    json.dump({"v": 1, "p": {k: v for k, v in perc.items() if k in usate}},
+              open("percorsi.json", "w", encoding="utf-8"), separators=(",", ":"))
+    mancano = len({l["rk"] for l in dati["linee"] if l["rk"] not in perc and not l.get("amb")})
+    report.append("Percorsi su strada: %d pronti, %d nuovi ora, %d ancora da calcolare (linee ambigue escluse)" % (len(perc), nuovi, mancano))
+
+
 # ====================== AVVISI ======================
 def costruisci_avvisi(report):
     av = []
@@ -540,6 +676,7 @@ if __name__ == "__main__":
     avvisi = costruisci_avvisi(report)
     if dati["linee"]:
         aggiorna_fermate(dati, report)
+        aggiorna_percorsi(dati, report)
         json.dump(dati, open("data.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     else:
         report.append("ATTENZIONE: nessun orario letto, data.json non aggiornato")

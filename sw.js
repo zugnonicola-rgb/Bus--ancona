@@ -1,6 +1,6 @@
 // Service worker di Bus Ancona: orari e app disponibili anche senza rete.
 // Per forzare un aggiornamento della cache cambia il numero di versione qui sotto.
-const V = "bus-v1", T = "bus-tiles-v1";
+const V = "bus-v2", T = "bus-tiles-v1";
 const SHELL = ["./", "index.html", "maplibre-gl.js", "maplibre-gl.css", "manifest.webmanifest", "icon-192.png"];
 
 self.addEventListener("install", e => {
@@ -45,7 +45,7 @@ self.addEventListener("fetch", e => {
   if (u.origin === location.origin) {
     if (r.mode === "navigate") {
       e.respondWith(reteOCache(r, V).catch(() => caches.match("index.html")));
-    } else if (/\/(data|avvisi)\.json$|\/report\.txt$/.test(u.pathname)) {
+    } else if (/\/(data|avvisi|percorsi)\.json$|\/report\.txt$/.test(u.pathname)) {
       e.respondWith(reteOCache(r, V));
     } else {
       e.respondWith(cacheORete(r, V));

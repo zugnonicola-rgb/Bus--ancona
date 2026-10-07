@@ -23,6 +23,6 @@ jobs:
         run: |
           git config user.email "aggiornamento@users.noreply.github.com"
           git config user.name "aggiornamento"
-          git add data.json avvisi.json report.txt
+          git add -A
           git commit -m "aggiorna dati" || echo "niente da salvare"
           git push

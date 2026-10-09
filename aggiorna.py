@@ -645,6 +645,22 @@ def aggiorna_percorsi(dati, report):
     report.append("Percorsi su strada: %d pronti, %d nuovi ora, %d ancora da calcolare (linee ambigue escluse)" % (len(perc), nuovi, mancano))
 
 
+def aggiorna_osm_stops(report):
+    """Salva tutte le fermate bus di OpenStreetMap (anche quelle assenti dagli orari PDF) per mostrarle sulla mappa."""
+    try:
+        v = json.load(open("fermate_osm.json", encoding="utf-8"))
+        if time.time() - v.get("t", 0) < 20 * 86400 and v.get("s"):
+            return
+    except Exception:
+        pass
+    osm = fermate_osm()
+    if not osm:
+        report.append("Fermate OpenStreetMap non scaricate (riprovo al prossimo giro)")
+        return
+    json.dump({"t": int(time.time()), "s": [[round(lo, 5), round(la, 5), nm] for la, lo, nm in osm]},
+              open("fermate_osm.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
+    report.append("Fermate OpenStreetMap salvate per la mappa: %d" % len(osm))
+
 # ====================== AVVISI ======================
 def costruisci_avvisi(report):
     av = []
@@ -677,6 +693,7 @@ if __name__ == "__main__":
     if dati["linee"]:
         aggiorna_fermate(dati, report)
         aggiorna_percorsi(dati, report)
+        aggiorna_osm_stops(report)
         json.dump(dati, open("data.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     else:
         report.append("ATTENZIONE: nessun orario letto, data.json non aggiornato")

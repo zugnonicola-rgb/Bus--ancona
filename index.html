@@ -120,18 +120,6 @@ label.chk input{width:auto}
 .dirs{display:flex;gap:8px;margin-bottom:6px}
 .db{flex:1;padding:9px 6px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit;font-size:14px}
 .db.sel{background:var(--ink);color:var(--card);border-color:var(--ink)}
-#buses{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;overflow:hidden}
-.bus{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;--rc:#fff}
-.bus .ly{position:absolute;left:0;top:0;width:var(--bw,8px);height:var(--bl,30px);will-change:transform;transform-origin:50% 50%;pointer-events:none}
-.bus .rf{pointer-events:auto;cursor:pointer}
-.bus svg{width:100%;height:100%;display:block;overflow:visible}
-.bus .bhit{position:absolute;left:50%;top:50%;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%}
-.bus.hl{--rc:var(--lc);z-index:3}.bus.hl .rf svg{filter:drop-shadow(0 0 3px rgba(0,0,0,.45))}
-.bus.dim{opacity:.3}.bus.w{opacity:.88}.bus.brk{--tl:#ff2a2a}
-#buses.dots .ly{width:14px!important;height:14px!important}
-#buses.dots .bl{display:none}
-#buses.dots .rf svg{display:none}
-#buses.dots .rf::after{content:"";position:absolute;inset:0;border-radius:50%;background:var(--rc);border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.35);box-sizing:border-box}
 /* ===== stile Apple: materiali in vetro, angoli morbidi, blu di sistema ===== */
 :root{--bg:#f2f2f7;--card:#fff;--ink:#1c1c1e;--mute:#8e8e93;--line:rgba(60,60,67,.14);--acc:#007aff;--on:#fff;--sep:rgba(60,60,67,.14);--glass:rgba(249,249,251,.76);--warn:#a05a00}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#1c1c1e;--card:#2c2c2e;--ink:#f2f2f7;--mute:#98989f;--line:rgba(235,235,245,.14);--acc:#0a84ff;--on:#fff;--sep:rgba(235,235,245,.14);--glass:rgba(30,31,35,.74);--warnbg:#3b2d0f;--warn:#ffc15a}}
@@ -172,29 +160,6 @@ label.chk input:checked{background:#34c759}label.chk input:checked::after{transf
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-<linearGradient id="roofg" x1="0" x2="1"><stop offset="0" stop-color="#d6dde2"/><stop offset=".16" stop-color="#f3f6f7"/><stop offset=".5" stop-color="#fff"/><stop offset=".84" stop-color="#f3f6f7"/><stop offset="1" stop-color="#d6dde2"/></linearGradient>
-<linearGradient id="wallg" x1="0" x2="1"><stop offset="0" stop-color="#38485a"/><stop offset=".5" stop-color="#5d7184"/><stop offset="1" stop-color="#38485a"/></linearGradient>
-<linearGradient id="glassg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f2b36"/><stop offset="1" stop-color="#3b4d5e"/></linearGradient>
-<symbol id="busBase" viewBox="0 0 60 276" style="overflow:visible">
-<rect x="-7" y="-5" width="74" height="286" rx="24" fill="#000" opacity=".09"/><rect x="-4" y="-2" width="68" height="280" rx="21" fill="#000" opacity=".14"/>
-<rect x="-3" y="58" width="6" height="38" rx="2.5" fill="#12171c"/><rect x="57" y="58" width="6" height="38" rx="2.5" fill="#12171c"/>
-<rect x="-3" y="186" width="6" height="38" rx="2.5" fill="#12171c"/><rect x="57" y="186" width="6" height="38" rx="2.5" fill="#12171c"/>
-<rect x="0" y="0" width="60" height="276" rx="15" fill="url(#wallg)"/>
-<rect x="0" y="236" width="60" height="40" rx="15" fill="#2a3642"/>
-</symbol>
-<symbol id="busRoof" viewBox="0 0 60 276" style="overflow:visible">
-<rect x="-6" y="38" width="9" height="13" rx="4" fill="#1f2a33"/><rect x="57" y="38" width="9" height="13" rx="4" fill="#1f2a33"/>
-<rect x="0" y="0" width="60" height="276" rx="15" fill="url(#roofg)" stroke="#aab6be" stroke-width="1.6"/>
-<path d="M7 17Q30 3 53 17L51 55H9Z" fill="url(#glassg)"/><path d="M11 21Q30 10 49 21L48 30Q30 20 12 30Z" fill="#fff" opacity=".22"/>
-<rect x="5" y="62" width="4.5" height="178" rx="2.2" fill="#2f3d49" opacity=".5"/><rect x="50.5" y="62" width="4.5" height="178" rx="2.2" fill="#2f3d49" opacity=".5"/>
-<rect x="13" y="62" width="34" height="180" rx="8" style="fill:var(--rc,#fff)" stroke="#c9d2d8" stroke-width="1.2"/>
-<rect x="18" y="84" width="24" height="40" rx="6" fill="#000" opacity=".07" stroke="#000" stroke-opacity=".08"/><rect x="18" y="140" width="24" height="40" rx="6" fill="#000" opacity=".07" stroke="#000" stroke-opacity=".08"/>
-<rect x="29" y="62" width="2" height="180" fill="#fff" opacity=".55"/>
-<rect x="11" y="248" width="38" height="18" rx="6" fill="url(#glassg)"/>
-<rect x="6" y="2" width="10" height="5" rx="2.5" fill="#fff1b8"/><rect x="44" y="2" width="10" height="5" rx="2.5" fill="#fff1b8"/>
-<rect x="6" y="269" width="10" height="4.5" rx="2.2" style="fill:var(--tl,#b33)"/><rect x="44" y="269" width="10" height="4.5" rx="2.2" style="fill:var(--tl,#b33)"/>
-</symbol></defs></svg>
 <div id="map"></div>
 <div id="home" hidden></div>
 <div id="top"><div id="avvbar" hidden></div><div id="chip" hidden></div></div>
@@ -407,7 +372,8 @@ function assicura(){if(!MAP||MAP.getSource("linea"))return;
   MAP.addSource("osm",{type:"geojson",data:FC([])});OSMOK=false;
   MAP.addLayer({id:"osm",type:"circle",source:"osm",minzoom:14.6,paint:{"circle-radius":["interpolate",["linear"],["zoom"],14.6,3,17,6.5],"circle-color":"#ffffff","circle-stroke-color":"#007aff","circle-stroke-width":["interpolate",["linear"],["zoom"],14.6,1.2,17,2.2]}},"fermate");
   if(!EV){EV=true;
-   MAP.on("click",e=>{try{const r=14,bb=[[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]];
+   MAP.on("click",e=>{try{if(BUSON&&BPOS.length){let m=null,dm=1e9;for(const b of BPOS){const d=Math.hypot(b.x-e.point.x,b.cy-e.point.y);if(d<b.r&&d<dm){dm=d;m=b}}if(m){selezionaBus(m.li,m.k);return}}
+    const r=14,bb=[[e.point.x-r,e.point.y-r],[e.point.x+r,e.point.y+r]];
     const f=MAP.queryRenderedFeatures(bb,{layers:["fermate"]});
     if(!f.length){const fo=MAP.getLayer("osm")?MAP.queryRenderedFeatures(bb,{layers:["osm"]}):[];if(fo.length){apriOSM(+fo[0].properties.i);return}
      if(tab==="stop"||tab==="osm"){tab="";render()}return}
@@ -424,7 +390,7 @@ function initMap(){
   MAP=new maplibregl.Map({container:"map",style:stileMappa(),center:[13.5189,43.6158],zoom:13,attributionControl:{compact:true},pixelRatio:LEGG?1.5:Math.min(window.devicePixelRatio||1,2),fadeDuration:LEGG?0:300});
   MAP.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
   if(!LEGG)MAP.addControl(new Ctl3D(),"top-right");
-  MAP.on("style.load",assicura);
+  MAP.on("style.load",assicura);MAP.on("render",()=>{ULTDIS=performance.now();disegnaTutti()});
   MAP.on("error",e=>{if(PRONTA)return;const m=(e&&e.error&&e.error.message)||"errore sconosciuto";$("#chip").hidden=false;$("#chip").textContent="Problema con la mappa: "+m})
  }catch(e){MAP=null;mapErr("Il tuo browser non riesce ad aprire la mappa (serve WebGL). Gli orari funzionano dal menu in basso.",String(e&&e.message||e))}}
 let SEG=null,TRIP=null;
@@ -459,9 +425,48 @@ function puntoA(g,m){const c=g.cum,P=g.P;let lo=0,hi=c.length-1;while(hi-lo>1){c
  const rad=(br+90)*Math.PI/180;
  return {c:[lon+3*Math.sin(rad)/(111320*Math.cos(lat*Math.PI/180)),lat+3*Math.cos(rad)/110540],br}}   // 3 m a destra della marcia
 const adessoMin=()=>{const d=new Date();return d.getHours()*60+d.getMinutes()+d.getSeconds()/60};
-let SELBUS=false,ATTIVI=[],BUSEL=new Map(),OV=null,ULTAGG=-1e9,BZ=-1,BH=3;
-function ovInit(){if(OV||!MAP)return;OV=document.createElement("div");OV.id="buses";MAP.getCanvasContainer().appendChild(OV);
- OV.addEventListener("click",e=>{const b=e.target.closest(".rf")&&e.target.closest(".bus");if(b){e.stopPropagation();selezionaBus(+b.dataset.li,+b.dataset.k)}})}
+// ===== Autobus 3D a strati: ogni "fetta" e' la sagoma del bus a una certa altezza =====
+const B3={W:96,L:448,PX:37.5};
+const SL=[{z:0,t:"w"},{z:.35,t:"w2"},{z:.7,t:"sk"},{z:1.05,t:"lo"},{z:1.4,t:"g",f:.1,r:.05,c:"#1c2631"},{z:1.75,t:"g",f:.34,r:.08,c:"#25343f"},
+ {z:2.1,t:"g",f:.58,r:.1,c:"#2f4152"},{z:2.45,t:"g",f:.82,r:.14,c:"#3b5063"},{z:2.8,t:"r0"},{z:3.1,t:"r"},{z:3.4,t:"ac"}];
+function rrect(x,a,b,w,h,r){x.beginPath();if(x.roundRect)x.roundRect(a,b,w,h,r);else x.rect(a,b,w,h)}
+function fetta(fab,s,pelle,tetto,frena){
+ const W=B3.W,L=B3.L,P=B3.PX,cv=fab(W,L),x=cv.getContext("2d"),R=.32*P;
+ const fp=(f,r,sd,col)=>{rrect(x,sd*P,f*P,W-2*sd*P,L-(f+r)*P,R);x.fillStyle=col;x.fill()};
+ const shade=a=>{x.globalCompositeOperation="source-atop";const g=x.createLinearGradient(0,0,W,0);
+  g.addColorStop(0,`rgba(0,0,0,${a})`);g.addColorStop(.22,"rgba(0,0,0,0)");g.addColorStop(.5,`rgba(255,255,255,${a*.8})`);g.addColorStop(.78,"rgba(0,0,0,0)");g.addColorStop(1,`rgba(0,0,0,${a})`);
+  x.fillStyle=g;x.fillRect(0,0,W,L);x.globalCompositeOperation="source-over"};
+ const ruote=(w)=>{for(const u of [2.4,8.4])for(const sd of [0,1]){x.fillStyle="#0c1115";rrect(x,sd?W-w*P:0,(u-.55)*P,w*P,1.1*P,6);x.fill()}};
+ switch(s.t){
+  case"w":fp(.5,.6,.35,"#10161b");ruote(.42);break;
+  case"w2":fp(.5,.6,.3,"#171e24");ruote(.4);break;
+  case"sk":fp(.08,.12,.04,"#b3bcc3");shade(.25);x.fillStyle="#161c22";for(const u of [2.4,8.4])for(const sd of [0,1]){rrect(x,sd?W-.62*P:-2,(u-.62)*P,.66*P,1.24*P,8);x.fill()}break;
+  case"lo":fp(.02,.04,.02,pelle);shade(.3);
+   x.fillStyle="#fff2b3";rrect(x,.18*P,.1*P,.5*P,.22*P,5);x.fill();rrect(x,W-.68*P,.1*P,.5*P,.22*P,5);x.fill();
+   x.fillStyle=frena?"#ff2323":"#c43030";rrect(x,.18*P,L-.32*P,.5*P,.2*P,5);x.fill();rrect(x,W-.68*P,L-.32*P,.5*P,.2*P,5);x.fill();break;
+  case"g":fp(s.f,s.r,.03,s.c);break;
+  case"r0":fp(1.12,.3,.1,tetto);shade(.3);break;
+  case"r":fp(1.16,.34,.16,tetto);shade(.34);x.strokeStyle="rgba(40,52,64,.38)";x.lineWidth=2.4;rrect(x,.16*P,1.16*P,W-.32*P,L-1.5*P,R);x.stroke();
+   x.strokeStyle="rgba(0,0,0,.10)";x.lineWidth=2;for(const [a,b] of [[3.0,4.6],[6.6,8.2]]){rrect(x,.62*P,a*P,W-1.24*P,(b-a)*P,10);x.stroke()}
+   x.fillStyle="rgba(255,255,255,.55)";x.fillRect(W/2-1.5,2.2*P,3,L-3.0*P);break;
+  case"ac":x.fillStyle="#e6ebef";for(const [a,b] of [[3.1,4.5],[6.7,8.1]]){rrect(x,.8*P,a*P,W-1.6*P,(b-a)*P,10);x.fill()}
+   x.fillStyle="rgba(0,0,0,.12)";for(const [a,b] of [[3.1,4.5],[6.7,8.1]])for(let i=1;i<4;i++)x.fillRect(.9*P,(a+(b-a)*i/4)*P-1,W-1.8*P,2);break}
+ return cv}
+function ombra(fab){const W=B3.W*1.7,L=B3.L*1.12,cv=fab(W,L),x=cv.getContext("2d");
+ for(let i=0;i<12;i++){const k=i/11,g=(1-k)*.34*B3.PX;x.fillStyle="rgba(0,0,0,.035)";rrect(x,W/2-B3.W/2-g*.9,L/2-B3.L/2-g,B3.W+g*1.8,B3.L+g*2,B3.PX*(.4+.5*(1-k)));x.fill()}return cv}
+function setBus(fab,pelle,tetto,frena){return SL.map(s=>fetta(fab,s,pelle,tetto,frena))}
+// disegna un bus: x,y = punto a terra; ang = gradi (0 = nord, orario); mpp = metri per pixel
+function disegnaBus(ctx,set,sh,x,y,ang,mpp,pitchDeg,alpha){
+ const lpx=Math.max(12/mpp,28),wpx=Math.max(2.55/mpp,8),a=ang*Math.PI/180,cs=Math.cos(a),sn=Math.sin(a),cp=Math.cos(pitchDeg*Math.PI/180),
+  pe=Math.max(pitchDeg,22)*Math.PI/180,k=Math.sin(pe)/mpp,sw=wpx/B3.W,sl=lpx/B3.L;
+ ctx.globalAlpha=alpha;
+ ctx.setTransform(cs,sn*cp,-sn,cs*cp,x+.9/mpp*Math.sin(pe),y+1.2/mpp*Math.sin(pe));ctx.globalAlpha=alpha*.72;
+ ctx.drawImage(sh,-sh.width*sw/2,-sh.height*sl/2,sh.width*sw,sh.height*sl);ctx.globalAlpha=alpha;
+ for(let i=0;i<set.length;i++){ctx.setTransform(cs,sn*cp,-sn,cs*cp,x,y-SL[i].z*k);ctx.drawImage(set[i],-wpx/2,-lpx/2,wpx,lpx)}
+ ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1}
+
+
+let SELBUS=false,ATTIVI=[],ULTAGG=-1e9,ULTDIS=0,BC=null,BX=null,BPOS=[],BSET=new Map(),BSH=null,BBR=new Map();
 function ptM(g,m){const c=g.cum,P=g.P;m=Math.max(0,Math.min(m,c[c.length-1]));let lo=0,hi=c.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(c[mid]<=m)lo=mid;else hi=mid}
  const f=Math.min(1,Math.max(0,(m-c[lo])/((c[hi]-c[lo])||1))),a=P[lo],b=P[hi];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]}
 function puntoSmooth(g,m){const p0=ptM(g,m-8),p1=ptM(g,m+8),c=ptM(g,m);
@@ -473,26 +478,29 @@ function aggiornaAttivi(){const T=adessoMin(),out=[];
    if(!isSel&&!((tr.t0-6<=T&&T<=tr.t1+1)||(tr.t0-6<=T+1440&&T+1440<=tr.t1+1)))continue;
    out.push({l,li,g,tr,sel:isSel,key:li+"|"+tr.k,hl:selL&&(TRIP==null||isSel),dim:mapLine!==""&&!selL})}});
  ATTIVI=out}
-function creaBus(a){const el=document.createElement("div");el.className="bus";el.dataset.li=a.li;el.dataset.k=a.tr.k;el.style.setProperty("--lc",col(a.l.id));
- el.innerHTML='<div class="ly bl"><svg viewBox="0 0 60 276"><use href="#busBase"/></svg></div><div class="ly rf"><svg viewBox="0 0 60 276"><use href="#busRoof"/></svg><div class="bhit"></div></div>';
- OV.appendChild(el);return {el,bl:el.firstChild,rf:el.lastChild,br:null,cl:""}}
-function frameBus(){requestAnimationFrame(frameBus);
- if(!BUSON||!MAP||!PRONTA||!PERC||document.hidden)return;ovInit();
- const selB=mapLine!==""&&TRIP!=null;if(tab&&!selB){OV.style.display="none";return}OV.style.display="";
+const fabbrica=(w,h)=>{const c=document.createElement("canvas");c.width=w;c.height=h;return c};
+function setPer(k,pelle,tetto,frena){const kk=k+(frena?"!":"");let x=BSET.get(kk);if(!x){x=setBus(fabbrica,pelle,tetto,frena);BSET.set(kk,x)}return x}
+function bcInit(){if(BC||!MAP)return;BC=document.createElement("canvas");BC.id="bc";BC.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
+ MAP.getCanvasContainer().appendChild(BC);BX=BC.getContext("2d");BSH=ombra(fabbrica)}
+function disegnaTutti(){
+ if(!BUSON||!MAP||!PRONTA||!PERC||document.hidden)return;bcInit();
+ const selB=mapLine!==""&&TRIP!=null,cv=MAP.getCanvas(),W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(window.devicePixelRatio||1,2);
+ if(BC.width!==Math.round(W*dpr)||BC.height!==Math.round(H*dpr)){BC.width=Math.round(W*dpr);BC.height=Math.round(H*dpr)}
+ BX.setTransform(dpr,0,0,dpr,0,0);BX.clearRect(0,0,W,H);BPOS=[];if(tab&&!selB)return;
  const now=performance.now();if(now-ULTAGG>1000){ULTAGG=now;aggiornaAttivi();aggiornaStato()}
- const T=adessoMin(),z=MAP.getZoom(),pitch=MAP.getPitch(),rot=MAP.getBearing(),cv=MAP.getCanvas(),W=cv.clientWidth,H=cv.clientHeight,dots=z<15.2;
- OV.classList.toggle("dots",dots);
- if(Math.abs(z-BZ)>.01){BZ=z;const mpp=78271.5*Math.cos(43.6*Math.PI/180)/Math.pow(2,z),L=Math.max(12/mpp,26);OV.style.setProperty("--bl",L+"px");OV.style.setProperty("--bw",Math.max(2.55/mpp,6.5)+"px");BH=dots?0:Math.max(1.6,Math.min(6.5,2.4/mpp))}
- const seen=new Set();
+ const T=adessoMin(),z=MAP.getZoom(),pitch=MAP.getPitch(),rot=MAP.getBearing(),dots=z<15.2,mpp=78271.5*Math.cos(43.6*Math.PI/180)/Math.pow(2,z),v=[];
  for(const a of ATTIVI){if(z<12.5&&!a.sel)continue;const p=a.sel?posSel(a.tr,T):posAt(a.tr,T);if(!p)continue;
-  const q=puntoSmooth(a.g,p.m),xy=MAP.project(q.c);if(xy.x<-70||xy.y<-70||xy.x>W+70||xy.y>H+70)continue;
-  let e=BUSEL.get(a.key);if(!e){e=creaBus(a);BUSEL.set(a.key,e)}seen.add(a.key);
-  if(e.br==null)e.br=q.br;else e.br+=(((q.br-e.br+540)%360)-180)*.2;
-  const rt=`translate(-50%,-50%) rotateX(${dots?0:pitch}deg) rotate(${dots?0:(e.br-rot).toFixed(1)}deg)`,X=xy.x.toFixed(1);
-  e.rf.style.transform=`translate3d(${X}px,${xy.y.toFixed(1)}px,0) ${rt}`;e.bl.style.transform=`translate3d(${X}px,${(xy.y+BH).toFixed(1)}px,0) ${rt}`;
-  const cl=(a.hl?" hl":"")+(a.dim?" dim":"")+(p.st==="w"?" w":"")+(p.st==="r"&&p.v<.8?" brk":"");if(cl!==e.cl){e.el.className="bus"+cl;e.cl=cl}}
- for(const [k,e] of BUSEL)if(!seen.has(k)){e.el.remove();BUSEL.delete(k)}}
-requestAnimationFrame(frameBus);
+  const q=puntoSmooth(a.g,p.m),xy=MAP.project(q.c);if(xy.x<-90||xy.y<-90||xy.x>W+90||xy.y>H+90)continue;
+  let br=BBR.get(a.key);br=br==null?q.br:br+((q.br-br+540)%360-180)*.2;BBR.set(a.key,br);v.push({a,p,x:xy.x,y:xy.y,ang:br-rot})}
+ v.sort((m,n)=>(m.a.sel-n.a.sel)||(m.y-n.y));
+ const lpx=Math.max(12/mpp,28),lift=3.3/mpp*Math.sin(Math.max(pitch,22)*Math.PI/180)*.5;
+ for(const b of v){const a=b.a,colr=col(a.l.id),al=a.dim?.3:b.p.st==="w"?.88:1;
+  if(dots){BX.globalAlpha=al;BX.beginPath();BX.arc(b.x,b.y,a.hl?7:5,0,6.3);BX.fillStyle=a.hl?colr:"#fff";BX.shadowColor="rgba(0,0,0,.35)";BX.shadowBlur=4;BX.fill();BX.shadowBlur=0;BX.lineWidth=2;BX.strokeStyle=a.hl?"#fff":"#5b6b76";BX.stroke();BX.globalAlpha=1}
+  else{const set=a.hl?setPer("c"+a.l.id,colr,colr,b.p.st==="r"&&b.p.v<.8):setPer("w","#eef2f4","#ffffff",b.p.st==="r"&&b.p.v<.8);
+   disegnaBus(BX,set,BSH,b.x,b.y,b.ang,mpp,pitch,al)}
+  BPOS.push({x:b.x,cy:b.y-(dots?0:lift),r:dots?18:Math.max(24,lpx*.55),li:a.li,k:a.tr.k})}}
+function loopBus(){requestAnimationFrame(loopBus);const t=performance.now();if(t-ULTDIS>10){ULTDIS=t;disegnaTutti()}}
+requestAnimationFrame(loopBus);
 function selezionaBus(li,k){const l=ATT[li],g=geo(l),tr=g&&trips(l).find(t=>t.k===k);if(!tr)return;const p=posSel(tr,adessoMin());
  let i0=p.st==="w"?l.f.findIndex(s=>s[1][k]):l.f.findIndex((s,q)=>g.sp[q]>=p.m-5&&s[1][k]);if(i0<0)i0=l.f.length-1;
  mapLine=String(li);TRIP=k;SEG=[i0,l.f.length-1];SELBUS=true;tab="";render();drawMap()}

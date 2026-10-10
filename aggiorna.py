@@ -445,10 +445,20 @@ def fermate_osm():
          'node["highway"="bus_stop"]%s;way["highway"="bus_stop"]%s;'
          'node["public_transport"="platform"]%s;way["public_transport"="platform"]%s;'
          'node["public_transport"="stop_position"]["bus"="yes"]%s;);out center tags;') % ((box,) * 5)
-    req = urllib.request.Request("https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(q),
-                                 headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
-    with urllib.request.urlopen(req, timeout=150) as r:
-        d = json.loads(r.read().decode("utf-8"))
+    d, ultimo = None, None
+    for base in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
+                 "https://overpass.private.coffee/api/interpreter"):
+        try:
+            req = urllib.request.Request(base + "?data=" + urllib.parse.quote(q),
+                                         headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
+            with urllib.request.urlopen(req, timeout=150) as r:
+                d = json.loads(r.read().decode("utf-8"))
+            break
+        except Exception as e:
+            ultimo = e
+            time.sleep(3)
+    if d is None:
+        raise RuntimeError("Overpass non raggiungibile: %s" % ultimo)
     out = []
     for e in d.get("elements", []):
         t = e.get("tags", {})
@@ -717,9 +727,13 @@ def aggiorna_osm_stops(report):
             return
     except Exception:
         pass
-    osm = fermate_osm()
+    try:
+        osm = fermate_osm()
+    except Exception as e:
+        report.append("Fermate OpenStreetMap non scaricate (%s): riprovo al prossimo giro" % e)
+        return
     if not osm:
-        report.append("Fermate OpenStreetMap non scaricate (riprovo al prossimo giro)")
+        report.append("Fermate OpenStreetMap non scaricate (elenco vuoto): riprovo al prossimo giro")
         return
     json.dump({"t": int(time.time()), "q": 2, "s": [[round(lo, 5), round(la, 5), nm] for la, lo, nm in osm]},
               open("fermate_osm.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
@@ -755,9 +769,15 @@ if __name__ == "__main__":
     dati, report = costruisci_orari()
     avvisi = costruisci_avvisi(report)
     if dati["linee"]:
-        aggiorna_fermate(dati, report)
-        aggiorna_percorsi(dati, report)
-        aggiorna_osm_stops(report)
+        for nome_fase, fase in (("fermate", lambda: aggiorna_fermate(dati, report)),
+                                ("percorsi", lambda: aggiorna_percorsi(dati, report)),
+                                ("fermate OpenStreetMap", lambda: aggiorna_osm_stops(report))):
+            try:
+                fase()
+            except Exception as e:
+                import traceback
+                report.append("ERRORE nella fase '%s': %s" % (nome_fase, e))
+                print(traceback.format_exc())
         json.dump(dati, open("data.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     else:
         report.append("ATTENZIONE: nessun orario letto, data.json non aggiornato")

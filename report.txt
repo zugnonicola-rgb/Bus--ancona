@@ -1,4 +1,4 @@
-Aggiornato: 2026-10-10 04:25 UTC | linee: 359 | avvisi: 3
+Aggiornato: 2026-10-10 08:33 UTC | linee: 359 | avvisi: 3
 urbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/10/AnconaFerialeInvernalescolastico1102026.pdf
   linee/direzioni lette: 53
 extraurbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/extraurbanoconeroferialescolastico14_09_2026.pdf
@@ -33,6 +33,8 @@ urbano | Feriale invernale (vacanze) | https://www.conerobus.it/wp-content/uploa
   linee/direzioni lette: 51
 urbano | Festivo estivo | https://www.conerobus.it/wp-content/uploads/2026/06/AnconaFestivoEstivo2026_06_28.pdf
   linee/direzioni lette: 43
+  ricerca per nome su OpenStreetMap non riuscita: HTTP Error 504: Gateway Timeout
 Fermate con posizione: 446/483 (cercate ora: 0, trovate: 0)
   senza posizione (37): Acquaviva Semaforo; Barcaglione Carcere; Borghetto Centro; C.Ferretti Biv. Autostrada; Castelfidardo (Hotel Parco); Collina Centro; Crocette Centro; Distributore Carrefour; Grancetta Centro; LORETO Torrione Capolinea; Moie (Cimitero)r; Monsano (Centro)r; Monte Varino (Bivio); Montoro Centro; Montorso Centro; Padiglione Distributore Ip; Paterno Centro; Pietralacroce ViaDel Conero; Poggio Alto; Poggio Paese; Poggio costa - Inizio salita; Pontemagno (r); Portonovo Baia; Portorecanati And; RecanatiI (Squartabue); Rustico Centro; S.Rocchetto Centro; STAFFOLO (Casa Marchegiani); Sant` Amico; Senigallia Cap. ( Conerobus ); Sogemi; Terminal Biglietterie; Via Albertini dif. 37; Via M.Fanese - Passatempo Cent; ViaDella Marina-Marina Militar; Viale N. Sauro - Ist.To Mattei; Villaggio Barcaglione
 Percorsi su strada: 226 pronti, 0 nuovi ora, 0 ancora da calcolare (linee ambigue escluse)
+Fermate OpenStreetMap salvate per la mappa: 1082

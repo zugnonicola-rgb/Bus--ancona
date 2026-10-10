@@ -433,13 +433,63 @@ def token(n):
     return {t for t in re.sub(r"[^a-z0-9 ]", " ", pulisci_nome(n).lower()).split() if t not in stop and len(t) > 1}
 
 
+_OSM_CACHE = []
+
+
 def fermate_osm():
-    q = '[out:json][timeout:60];(node["highway"="bus_stop"](43.40,13.05,43.80,13.85);node["public_transport"="platform"]["bus"="yes"](43.40,13.05,43.80,13.85););out;'
+    """Tutte le fermate bus di OpenStreetMap nella zona (lat, lon, nome). Scaricate una volta per esecuzione."""
+    if _OSM_CACHE:
+        return _OSM_CACHE
+    box = "(43.40,13.05,43.80,13.85)"
+    q = ('[out:json][timeout:90];('
+         'node["highway"="bus_stop"]%s;way["highway"="bus_stop"]%s;'
+         'node["public_transport"="platform"]%s;way["public_transport"="platform"]%s;'
+         'node["public_transport"="stop_position"]["bus"="yes"]%s;);out center tags;') % ((box,) * 5)
     req = urllib.request.Request("https://overpass-api.de/api/interpreter?data=" + urllib.parse.quote(q),
                                  headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
-    with urllib.request.urlopen(req, timeout=120) as r:
+    with urllib.request.urlopen(req, timeout=150) as r:
         d = json.loads(r.read().decode("utf-8"))
-    return [(e["lat"], e["lon"], e.get("tags", {}).get("name", "")) for e in d.get("elements", [])]
+    out = []
+    for e in d.get("elements", []):
+        t = e.get("tags", {})
+        if any(k in t for k in ("railway", "tram", "subway", "ferry")) and t.get("bus") != "yes" and t.get("highway") != "bus_stop":
+            continue                                   # binari, tram, traghetti
+        if t.get("public_transport") == "platform" and t.get("highway") != "bus_stop" and t.get("bus") != "yes" and "bus" in t and t["bus"] == "no":
+            continue
+        lat = e.get("lat") if "lat" in e else (e.get("center") or {}).get("lat")
+        lon = e.get("lon") if "lon" in e else (e.get("center") or {}).get("lon")
+        if lat is None:
+            continue
+        out.append((lat, lon, t.get("name", "") or t.get("ref", "")))
+    # una fermata e' spesso mappata due volte (marciapiede + posizione): tengo una sola per ~8 metri e nome
+    pul, visti = [], {}
+    for lat, lon, nm in out:
+        k = (round(lat * 12000), round(lon * 12000))
+        if k in visti and (not nm or visti[k] == nm):
+            continue
+        visti[k] = nm
+        pul.append((lat, lon, nm))
+    _OSM_CACHE.extend(pul)
+    return _OSM_CACHE
+
+
+def risolvi_per_nome(nome, osm):
+    """Posizione di una fermata degli orari cercandola per nome tra le fermate OpenStreetMap (piu' vicina al centro)."""
+    nt = token(nome)
+    if not nt:
+        return None
+    best = None
+    for lat, lon, nm in osm:
+        if not nm:
+            continue
+        tn = token(nm)
+        inter = len(nt & tn)
+        sim = inter / max(len(nt), len(tn), 1)
+        if inter and (sim >= 0.6 or tn <= nt):
+            sc = sim * 100 - km(lat, lon, *CENTRO)
+            if best is None or sc > best[0]:
+                best = (sc, lat, lon)
+    return [round(best[1], 5), round(best[2], 5)] if best else None
 
 
 def aggancia(c, nome, osm):
@@ -488,6 +538,20 @@ def aggiorna_fermate(dati, report):
             continue
         nuove += 1
         trovate += 1 if coord[n] else 0
+    senza = [n for n in nomi if not coord.get(n) and n not in manuali]
+    if senza:
+        try:
+            osm0 = fermate_osm()
+            ris = 0
+            for n in senza:
+                c = risolvi_per_nome(n, osm0)
+                if c:
+                    coord[n] = c
+                    agg.add(n)
+                    ris += 1
+            report.append("Fermate senza posizione risolte dal nome su OpenStreetMap: %d su %d" % (ris, len(senza)))
+        except Exception as e:
+            report.append("  ricerca per nome su OpenStreetMap non riuscita: %s" % e)
     da_agg = [n for n in nomi if coord.get(n) and n not in manuali and n not in agg]
     if da_agg:
         try:
@@ -649,7 +713,7 @@ def aggiorna_osm_stops(report):
     """Salva tutte le fermate bus di OpenStreetMap (anche quelle assenti dagli orari PDF) per mostrarle sulla mappa."""
     try:
         v = json.load(open("fermate_osm.json", encoding="utf-8"))
-        if time.time() - v.get("t", 0) < 20 * 86400 and v.get("s"):
+        if time.time() - v.get("t", 0) < 20 * 86400 and v.get("s") and v.get("q") == 2:
             return
     except Exception:
         pass
@@ -657,7 +721,7 @@ def aggiorna_osm_stops(report):
     if not osm:
         report.append("Fermate OpenStreetMap non scaricate (riprovo al prossimo giro)")
         return
-    json.dump({"t": int(time.time()), "s": [[round(lo, 5), round(la, 5), nm] for la, lo, nm in osm]},
+    json.dump({"t": int(time.time()), "q": 2, "s": [[round(lo, 5), round(la, 5), nm] for la, lo, nm in osm]},
               open("fermate_osm.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
     report.append("Fermate OpenStreetMap salvate per la mappa: %d" % len(osm))
 

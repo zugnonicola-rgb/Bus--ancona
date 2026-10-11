@@ -1,0 +1,18 @@
+TRACCIATI: 226 tracciati unici; affidabili (nessuna deviazione, nessuna inversione, fermate <120 m dal tracciato): 17 (7%)
+  rapporto medio lunghezza/linea d'aria tra fermate: 1.82 (1.0-1.4 e' normale)
+  con tratti deviati: 175 | con inversioni a U: 136 | fermata >120 m dal tracciato: 35
+  I peggiori (linea | direzione | fermate | km | rapporto | tratti deviati | inversioni | scarto max m):
+   N | Osimo → Ancona | 20 | 149.7 | 1.23 | 0 | 3 | 6759
+   N | Ancona → Osimo | 13 | 190.7 | 1.80 | 2 | 1 | 5019
+   R/ e 24 | e 24 Stazione di Osimo → Ancona | 40 | 183.5 | 1.41 | 2 | 4 | 4130
+   22 | B. Bianche → Ancona | 29 | 90.8 | 1.89 | 8 | 1 | 882
+   22 | B. Bianche → Ancona O | 35 | 99.8 | 2.03 | 5 | 2 | 1553
+   11 | P.zza Cavour → P.zza Cavour | 30 | 59.1 | 3.13 | 7 | 1 | 828
+   6 | P.zza Cavour Via Vecchini → Stazio | 22 | 91.0 | 2.84 | 8 | 4 | 22
+   22 | B. Bianche → Ancona | 25 | 84.6 | 1.80 | 3 | 0 | 1553
+OPENSTREETMAP: 77 relazioni di linee bus nell'area
+  operatori/reti: Conerobus=58; Bucci=6; Flixbus=5; SAPS=2; STAV Vigevano SPA=2; Autoservizi Guizzetti s.r.l.=2; Reni=2
+  numeri di linea presenti (38): 1, 1/3, 1/5, 11, 12, 2, 2/6, 20, 22, 24, 3, 30, 31, 34, 35, 4, 41, 42, 421, 428, 44, 453, 46, 554, 6, 7, 8, 91, 92, 94, 94/, B, BS1, C, CD, CS, N431, RE1
+  linee degli orari ritrovate su OSM: 26 su 58  -> 1/3, 1/5, 11, 12, 2, 2/6, 22, 24, 3, 30, 31, 34, 35, 4, 41, 42, 44, 46, 6, 7, 8, 91, 92, 94, B, C
+  linee degli orari NON trovate su OSM: 1/4, 10, 21, 21/33, 33, 36, 37, 40, 43, 46/, 65, 89, 93, A, C.D., C.S., D, E, F, H, I, J, JEX1, L, M, N, O, P, Q, R, R/ e 24, T
+  dettaglio relazioni non letto (HTTP Error 500: Internal Server Error)

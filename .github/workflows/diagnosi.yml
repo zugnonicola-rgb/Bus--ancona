@@ -1,0 +1,25 @@
+name: Diagnosi dati
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  diagnosi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python diagnosi.py
+      - name: Salva
+        if: always()
+        run: |
+          git config user.name "diagnosi"
+          git config user.email "diagnosi@users.noreply.github.com"
+          git add diagnosi.txt
+          git commit -m "diagnosi" || echo "niente da salvare"
+          git push

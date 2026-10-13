@@ -82,16 +82,40 @@ def qualita_tracciati():
         R.append("   %s | %s | %d | %.1f | %.2f | %d | %d | %.0f" % (r[0], r[1][:34], r[2], r[3], r[4], r[5], r[6], r[7]))
 
 
-def overpass(q):
-    for base in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter"):
-        try:
-            req = urllib.request.Request(base + "?data=" + urllib.parse.quote(q),
-                                         headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
-            with urllib.request.urlopen(req, timeout=180) as r:
-                return json.loads(r.read().decode("utf-8"))
-        except Exception as e:
-            ultimo = e
+def overpass(q, tentativi=3):
+    import time
+    ultimo = None
+    for t in range(tentativi):
+        for base in ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
+                     "https://overpass.private.coffee/api/interpreter"):
+            try:
+                req = urllib.request.Request(base + "?data=" + urllib.parse.quote(q),
+                                             headers={"User-Agent": "bus-ancona-personale/1.0 (github.com/zugnonicola-rgb/bus-ancona)"})
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except Exception as e:
+                ultimo = e
+        time.sleep(6 * (t + 1))
     raise RuntimeError(ultimo)
+
+
+def lungh(punti):
+    return sum(dist_m((punti[i - 1]["lon"], punti[i - 1]["lat"]), (punti[i]["lon"], punti[i]["lat"])) for i in range(1, len(punti)))
+
+
+def analizza_relazione(r):
+    """Mette in fila i tratti di strada della relazione e conta le interruzioni."""
+    vie = [m for m in r.get("members", []) if m.get("type") == "way" and m.get("geometry") and m.get("role", "") in ("", "route", "forward", "backward")]
+    fermate = [m for m in r.get("members", []) if m.get("role", "").startswith(("platform", "stop"))]
+    rotture, km, ult = 0, 0.0, None
+    for w in vie:
+        g = w["geometry"]
+        km += lungh(g) / 1000
+        a, b = (g[0]["lon"], g[0]["lat"]), (g[-1]["lon"], g[-1]["lat"])
+        if ult is not None and min(dist_m(ult, a), dist_m(ult, b)) > 5:
+            rotture += 1
+        ult = b if (ult is None or dist_m(ult, a) <= dist_m(ult, b)) else a
+    return len(vie), rotture, km, len(fermate)
 
 
 def copertura_osm():
@@ -105,22 +129,39 @@ def copertura_osm():
         R.append("OPENSTREETMAP: non raggiungibile (%s)" % e)
         return
     rel = d.get("elements", [])
-    R.append("OPENSTREETMAP: %d relazioni di linee bus nell'area" % len(rel))
-    ops = collections.Counter((r["tags"].get("operator") or r["tags"].get("network") or "?") for r in rel)
-    R.append("  operatori/reti: " + "; ".join("%s=%d" % (k, v) for k, v in ops.most_common(8)))
-    refs = collections.Counter(r["tags"].get("ref", "?") for r in rel)
-    R.append("  numeri di linea presenti (%d): %s" % (len(refs), ", ".join(sorted(refs)[:60])))
-    comuni = sorted(x for x in ids if x in refs)
-    R.append("  linee degli orari ritrovate su OSM: %d su %d  -> %s" % (len(comuni), len(ids), ", ".join(comuni)))
-    R.append("  linee degli orari NON trovate su OSM: %s" % ", ".join(sorted(ids - set(refs))[:40]))
-    try:
-        d2 = overpass('[out:json][timeout:120];relation["type"="route"]["route"="bus"](43.40,13.05,43.80,13.85);'
-                      'out body;')
-        con_fermate = sum(1 for r in d2["elements"] if any(m.get("role", "").startswith(("platform", "stop")) for m in r.get("members", [])))
-        con_vie = sum(1 for r in d2["elements"] if any(m.get("type") == "way" and m.get("role", "") in ("", "route") for m in r.get("members", [])))
-        R.append("  relazioni con fermate collegate: %d | con tratti di strada: %d (servono per un tracciato esatto)" % (con_fermate, con_vie))
-    except Exception as e:
-        R.append("  dettaglio relazioni non letto (%s)" % e)
+    cone = [r for r in rel if "conerobus" in (r["tags"].get("operator", "") + r["tags"].get("network", "")).lower()]
+    R.append("OPENSTREETMAP: %d relazioni bus nell'area, di cui Conerobus %d" % (len(rel), len(cone)))
+    refs = collections.Counter(r["tags"].get("ref", "?") for r in cone)
+    R.append("  linee degli orari ritrovate (per numero): %s" % ", ".join(sorted(x for x in ids if x in refs)))
+    mancanti = sorted(ids - set(refs))
+    R.append("  NON trovate per numero: %s" % ", ".join(mancanti))
+    # cerca le mancanti nel NOME delle relazioni (es. numero scritto diversamente)
+    for m in mancanti:
+        trovate = [r["tags"].get("name", "")[:45] + " [ref=" + r["tags"].get("ref", "-") + "]" for r in cone
+                   if m and (" " + m + " ") in (" " + r["tags"].get("name", "").replace(":", " ") + " ")]
+        if trovate:
+            R.append("    '%s' compare nel nome di: %s" % (m, " | ".join(trovate[:2])))
+    # dettaglio: strade collegate, continuita', fermate (a gruppi, con geometria)
+    righe = []
+    idl = [r["id"] for r in cone]
+    for i in range(0, len(idl), 6):
+        try:
+            dd = overpass("[out:json][timeout:180];rel(id:%s);out geom;" % ",".join(map(str, idl[i:i + 6])))
+        except Exception as e:
+            R.append("  gruppo %d..%d non letto (%s)" % (i, i + 6, e))
+            continue
+        for r in dd.get("elements", []):
+            nv, rot, km, nf = analizza_relazione(r)
+            t = r["tags"]
+            righe.append((t.get("ref", "?"), (t.get("from", "") + " > " + t.get("to", ""))[:42] or t.get("name", "")[:42], nv, rot, km, nf,
+                          t.get("public_transport:version", "-")))
+    if righe:
+        buone = [x for x in righe if x[2] > 0 and x[3] == 0]
+        R.append("  DETTAGLIO: %d relazioni lette; con strade collegate e SENZA interruzioni: %d; con fermate collegate: %d"
+                 % (len(righe), len(buone), sum(1 for x in righe if x[5] > 0)))
+        R.append("  ref | da > a | tratti strada | interruzioni | km | fermate | versione PT")
+        for x in sorted(righe, key=lambda z: z[0]):
+            R.append("   %s | %s | %d | %d | %.1f | %d | %s" % x)
 
 
 if __name__ == "__main__":

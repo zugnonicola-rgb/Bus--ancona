@@ -10,9 +10,66 @@ TRACCIATI: 226 tracciati unici; affidabili (nessuna deviazione, nessuna inversio
    11 | P.zza Cavour → P.zza Cavour | 30 | 59.1 | 3.13 | 7 | 1 | 828
    6 | P.zza Cavour Via Vecchini → Stazio | 22 | 91.0 | 2.84 | 8 | 4 | 22
    22 | B. Bianche → Ancona | 25 | 84.6 | 1.80 | 3 | 0 | 1553
-OPENSTREETMAP: 77 relazioni di linee bus nell'area
-  operatori/reti: Conerobus=58; Bucci=6; Flixbus=5; SAPS=2; STAV Vigevano SPA=2; Autoservizi Guizzetti s.r.l.=2; Reni=2
-  numeri di linea presenti (38): 1, 1/3, 1/5, 11, 12, 2, 2/6, 20, 22, 24, 3, 30, 31, 34, 35, 4, 41, 42, 421, 428, 44, 453, 46, 554, 6, 7, 8, 91, 92, 94, 94/, B, BS1, C, CD, CS, N431, RE1
-  linee degli orari ritrovate su OSM: 26 su 58  -> 1/3, 1/5, 11, 12, 2, 2/6, 22, 24, 3, 30, 31, 34, 35, 4, 41, 42, 44, 46, 6, 7, 8, 91, 92, 94, B, C
-  linee degli orari NON trovate su OSM: 1/4, 10, 21, 21/33, 33, 36, 37, 40, 43, 46/, 65, 89, 93, A, C.D., C.S., D, E, F, H, I, J, JEX1, L, M, N, O, P, Q, R, R/ e 24, T
-  dettaglio relazioni non letto (HTTP Error 500: Internal Server Error)
+OPENSTREETMAP: 77 relazioni bus nell'area, di cui Conerobus 58
+  linee degli orari ritrovate (per numero): 1/3, 1/5, 11, 12, 2, 2/6, 22, 24, 3, 30, 31, 34, 35, 4, 41, 42, 44, 46, 6, 7, 8, 91, 92, 94, B, C
+  NON trovate per numero: 1/4, 10, 21, 21/33, 33, 36, 37, 40, 43, 46/, 65, 89, 93, A, C.D., C.S., D, E, F, H, I, J, JEX1, L, M, N, O, P, Q, R, R/ e 24, T
+  DETTAGLIO: 58 relazioni lette; con strade collegate e SENZA interruzioni: 54; con fermate collegate: 58
+  ref | da > a | tratti strada | interruzioni | km | fermate | versione PT
+   1 | Stazione FS > Stazione FS | 104 | 0 | 11.6 | 15 | 2
+   1/3 | Piazza IV Novembre > Posatora | 109 | 0 | 8.1 | 28 | 2
+   1/3 | Posatora > Piazza IV Novembre | 99 | 0 | 7.0 | 24 | 2
+   1/5 | Piazza IV Novembre > Piazza d'Armi | 91 | 0 | 5.3 | 18 | 2
+   1/5 | Piazza d'Armi > Piazza IV Novembre | 90 | 0 | 5.3 | 18 | 2
+   11 | Piazza Cavour > Piazza Cavour | 90 | 0 | 7.6 | 29 | 2
+   12 | Piazza Ugo Bassi > Piazza Ugo Bassi | 115 | 0 | 7.3 | 16 | 2
+   2 | Piazza Cavour > Pinocchio | 77 | 0 | 5.1 | 19 | 2
+   2 | Pinocchio > Piazza Cavour | 72 | 0 | 4.7 | 18 | 2
+   2/6 | Piazza Cavour > Pinocchio | 116 | 0 | 8.1 | 32 | 2
+   2/6 | Pinocchio > Piazza Cavour | 126 | 0 | 8.5 | 34 | 2
+   20 | Terminal Bigletterie > Terminal Bigletteri | 52 | 0 | 3.8 | 8 | 2
+   22 | Brecce Bianche > Piazza Ugo Bassi | 65 | 0 | 7.3 | 24 | 2
+   22 | Brecce Bianche > Piazza Ugo Bassi | 78 | 0 | 7.6 | 22 | 2
+   22 | Piazza Ugo Bassi > Brecce Bianche | 61 | 0 | 8.0 | 28 | 2
+   22 | Piazza Ugo Bassi > Brecce Bianche | 88 | 0 | 7.9 | 23 | 2
+   24 | Baraccola Ovest > Piazza Ugo Bassi | 84 | 0 | 6.9 | 33 | 2
+   24 | Piazza Ugo Bassi > Baraccola Ovest | 79 | 1 | 7.8 | 35 | 2
+   3 | Piazza Cavour > Posatora | 74 | 0 | 5.6 | 18 | 2
+   3 | Posatora > Piazza Cavour | 64 | 0 | 4.5 | 15 | 2
+   30 | Ospedale Regionale > Piazza Ugo Bassi | 88 | 0 | 6.6 | 14 | 2
+   30 | Piazza Ugo Bassi > Ospedale Regionale | 90 | 0 | 6.7 | 12 | 2
+   31 | Ospedale Regionale > Piazza Ugo Bassi | 83 | 0 | 8.0 | 29 | 2
+   31 | Piazza Ugo Bassi > Ospedale Regionale | 70 | 0 | 6.8 | 23 | 2
+   34 | Piazza Ugo Bassi > Piazza Ugo Bassi | 72 | 1 | 5.8 | 25 | 2
+   35 | Ospedale Regionale > Ospedale Regionale | 87 | 0 | 3.7 | 10 | 2
+   4 | Stazione FS > Stazione FS | 108 | 0 | 10.4 | 10 | 2
+   41 | Stazione FS > Stazione FS | 82 | 0 | 6.5 | 25 | 2
+   42 | Piazza Cavour Via Vecchini > Via Gioberti | 88 | 0 | 5.5 | 18 | 2
+   42 | Via Gioberti > Piazza Cavour Via Vecchini | 73 | 0 | 5.3 | 21 | 2
+   42 | Piazza Ugo Bassi > Villa Romana | 42 | 0 | 4.3 | 17 | 2
+   42 | Villa Romana > Piazza Ugo Bassi | 44 | 0 | 5.2 | 20 | 2
+   42 | Piazza Cavour Via Vecchini > Villa Romana | 100 | 0 | 7.5 | 25 | 2
+   42 | Villa Romana > Piazza Cavour Via Vecchini | 84 | 0 | 7.3 | 28 | 2
+   44 | Baraccola > Stazione FS | 111 | 0 | 9.3 | 27 | 2
+   44 | Stazione FS > Baraccola | 123 | 0 | 13.5 | 3 | 2
+   46 | Piazza Cavour > Piazza Cavour | 239 | 0 | 16.7 | 2 | 2
+   46 | Piazza Cavour > Piazza Cavour | 230 | 0 | 17.3 | 2 | 2
+   6 | Piazza Cavour Via Vecchini > Stazione FS | 66 | 0 | 5.0 | 21 | 2
+   6 | Stazione FS > Piazza Cavour Via Vecchini | 74 | 0 | 5.4 | 23 | 2
+   7 | Piazza Cavour > Piazza Cavour | 76 | 0 | 5.4 | 17 | 2
+   8 | Piazza Cavour > Piazza Cavour | 81 | 0 | 6.8 | 25 | 2
+   91 | Piazza Stamira > Pietralacroce | 38 | 0 | 3.9 | 14 | 2
+   91 | Pietralacroce > Piazza Stamira | 56 | 0 | 4.3 | 15 | 2
+   92 | Piazza Stamira > Pietralacroce | 39 | 0 | 4.5 | 18 | 2
+   92 | Pietralacroce > Piazza Stamira | 50 | 0 | 4.2 | 14 | 2
+   94 | Portonovo > Stazione FS | 122 | 0 | 14.5 | 2 | 2
+   94 | Stazione FS > Portonovo | 112 | 0 | 14.5 | 2 | 2
+   94/ | Piazzetta Portonovo > Parcheggio Monte | 12 | 0 | 1.6 | 2 | 2
+   94/ | Parcheggio Monte (Portonovo) > Piazzetta P | 9 | 1 | 1.6 | 2 | 2
+   B | Montemarciano Via San Pietro > Ancona (Cap | 194 | 0 | 22.3 | 38 | 2
+   B | Ancona (Capolinea) > Montemarciano Via San | 209 | 0 | 22.1 | 36 | 2
+   B | Marina (Capolinea) > Ancona (Capolinea) | 170 | 1 | 17.9 | 30 | 2
+   B | Ancona (Capolinea) > Marina (Via Platani) | 180 | 0 | 17.7 | 29 | 2
+   C | Chiaravalle Capolinea > Ancona (Capolinea) | 239 | 0 | 23.0 | 33 | 2
+   C | Ancona (Capolinea) > Chiaravalle Capolinea | 245 | 0 | 22.6 | 30 | 2
+   CD | Piazza Cavour > Piazza Cavour | 64 | 0 | 5.6 | 23 | 2
+   CS | Piazza Cavour > Piazza Cavour | 68 | 0 | 6.7 | 32 | 2

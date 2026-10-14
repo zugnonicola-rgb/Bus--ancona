@@ -603,14 +603,19 @@ def dist_m(a, b):
     return math.hypot((a[0] - b[0]) * kx, (a[1] - b[1]) * 110540)
 
 
-def osrm_percorso(coords):
+def osrm_percorso(coords, curb=True):
     url = "https://router.project-osrm.org/route/v1/driving/" + ";".join("%.6f,%.6f" % c for c in coords) + \
-          "?overview=full&geometries=geojson&continue_straight=true"
+          "?overview=full&geometries=geojson&continue_straight=true" + ("&approaches=" + ";".join(["curb"] * len(coords)) if curb else "")
     req = urllib.request.Request(url, headers={"User-Agent": UA_GEO})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        j = json.loads(r.read().decode("utf-8"))
-    if j.get("code") != "Ok":
-        raise RuntimeError("OSRM: %s" % j.get("code"))
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            j = json.loads(r.read().decode("utf-8"))
+        if j.get("code") != "Ok":
+            raise RuntimeError("OSRM: %s" % j.get("code"))
+    except Exception:
+        if curb:
+            return osrm_percorso(coords, curb=False)
+        raise
     return j["routes"][0]["geometry"]["coordinates"]
 
 
@@ -683,61 +688,257 @@ def semplifica(P, tieni, tol=3.0):
     return nuovi, mappa
 
 
+# ---------- tracciati esatti dalle linee bus di OpenStreetMap ----------
+import collections
+
+REL_FILE = "osm_linee.json"
+RUOLI_FERMATA = ("platform", "platform_entry_only", "platform_exit_only", "stop", "stop_entry_only", "stop_exit_only")
+OVERPASS_URLS = ("https://overpass-api.de/api/interpreter", "https://overpass.kumi.systems/api/interpreter",
+                 "https://overpass.private.coffee/api/interpreter")
+
+
+def norm_ref(x):
+    return re.sub(r"[^a-z0-9]", "", (x or "").lower())
+
+
+def overpass_json(q, tentativi=3):
+    ultimo = None
+    for t in range(tentativi):
+        for base in OVERPASS_URLS:
+            try:
+                req = urllib.request.Request(base + "?data=" + urllib.parse.quote(q), headers={"User-Agent": UA_GEO})
+                with urllib.request.urlopen(req, timeout=180) as r:
+                    return json.loads(r.read().decode("utf-8"))
+            except Exception as e:
+                ultimo = e
+        time.sleep(5 * (t + 1))
+    raise RuntimeError("Overpass: %s" % ultimo)
+
+
+def assembla_vie(membri):
+    """Mette in fila i tratti di strada della relazione. Ritorna (punti [lon,lat], numero di interruzioni)."""
+    segs = [[(p["lon"], p["lat"]) for p in m["geometry"]] for m in membri
+            if m.get("type") == "way" and m.get("geometry") and m.get("role", "") in ("", "route", "forward", "backward")]
+    segs = [sg for sg in segs if len(sg) >= 2]
+    if not segs:
+        return [], 0
+    if len(segs) > 1:                      # verso del primo tratto: quello che finisce vicino al secondo
+        a, b, n = segs[0][0], segs[0][-1], segs[1]
+        if min(dist_m(a, n[0]), dist_m(a, n[-1])) < min(dist_m(b, n[0]), dist_m(b, n[-1])):
+            segs[0] = segs[0][::-1]
+    out, rotture = list(segs[0]), 0
+    for sg in segs[1:]:
+        fine = out[-1]
+        add = sg if dist_m(fine, sg[0]) <= dist_m(fine, sg[-1]) else sg[::-1]
+        d = dist_m(fine, add[0])
+        if d > 5:
+            rotture += 1
+        out += add[1:] if d <= 1.5 else add
+    return out, rotture
+
+
+def carica_relazioni(report):
+    """Linee Conerobus di OpenStreetMap: tracciato + fermate in ordine. Cache di 14 giorni."""
+    vecchie = []
+    try:
+        c = json.load(open(REL_FILE, encoding="utf-8"))
+        vecchie = c.get("r", [])
+        if vecchie and time.time() - c.get("t", 0) < 14 * 86400:
+            return vecchie
+    except Exception:
+        pass
+    try:
+        tags = overpass_json('[out:json][timeout:120];relation["type"="route"]["route"="bus"](43.40,13.05,43.80,13.85);out tags;')
+        cone = [r for r in tags["elements"] if "conerobus" in (r["tags"].get("operator", "") + r["tags"].get("network", "")).lower()]
+        grezze, nodi, vie = [], set(), set()
+        for i in range(0, len(cone), 6):
+            dd = overpass_json("[out:json][timeout:180];rel(id:%s);out geom;" % ",".join(str(r["id"]) for r in cone[i:i + 6]))
+            for r in dd["elements"]:
+                grezze.append(r)
+                for m in r.get("members", []):
+                    if m.get("role", "") in RUOLI_FERMATA:
+                        (nodi if m["type"] == "node" else vie).add(m["ref"]) if m["type"] in ("node", "way") else None
+        nomi = {}
+        for tipo, ids in (("node", sorted(nodi)), ("way", sorted(vie))):
+            for i in range(0, len(ids), 400):
+                q = "[out:json][timeout:120];%s(id:%s);out tags center;" % (tipo, ",".join(map(str, ids[i:i + 400])))
+                for e in overpass_json(q)["elements"]:
+                    t = e.get("tags", {})
+                    c2 = e.get("center") or {}
+                    nomi[(tipo, e["id"])] = (t.get("name") or t.get("ref") or "", e.get("lon", c2.get("lon")), e.get("lat", c2.get("lat")))
+        rel = []
+        for r in grezze:
+            g, rot = assembla_vie(r.get("members", []))
+            st = []
+            for m in r.get("members", []):
+                if m.get("role", "") in RUOLI_FERMATA and m["type"] in ("node", "way"):
+                    nm, lo, la = nomi.get((m["type"], m["ref"]), ("", None, None))
+                    lo = m.get("lon", lo)
+                    la = m.get("lat", la)
+                    if m["type"] == "way" and m.get("geometry"):
+                        lo = sum(p["lon"] for p in m["geometry"]) / len(m["geometry"])
+                        la = sum(p["lat"] for p in m["geometry"]) / len(m["geometry"])
+                    if lo is None or not nm:
+                        continue
+                    if st and st[-1][0] == nm and dist_m((st[-1][1], st[-1][2]), (lo, la)) < 60:
+                        continue
+                    st.append([nm, round(lo, 6), round(la, 6)])
+            t = r.get("tags", {})
+            rel.append({"id": r["id"], "ref": t.get("ref", ""), "from": t.get("from", ""), "to": t.get("to", ""), "rot": rot,
+                        "g": [[round(a, 5), round(b, 5)] for a, b in g], "st": st})
+        json.dump({"t": int(time.time()), "r": rel}, open(REL_FILE, "w", encoding="utf-8"), separators=(",", ":"))
+        report.append("Linee Conerobus da OpenStreetMap scaricate: %d (con tracciato continuo: %d)" % (len(rel), sum(1 for r in rel if r["g"] and not r["rot"])))
+        return rel
+    except Exception as e:
+        report.append("Linee OpenStreetMap non scaricate (%s)%s" % (e, ": uso la copia salvata" if vecchie else ""))
+        return vecchie
+
+
+def sim_nomi(a, b):
+    ta, tb = token(a), token(b)
+    inter = len(ta & tb)
+    if not inter:
+        return 0.0
+    if ta <= tb or tb <= ta:
+        return 0.85
+    return inter / max(len(ta), len(tb))
+
+
+def allinea(nomi, stops):
+    """Abbina in ordine le fermate degli orari a quelle della relazione (sottosequenza comune pesata)."""
+    n, m = len(nomi), len(stops)
+    sm = [[(lambda v: v if v >= 0.5 else 0.0)(sim_nomi(nomi[i], stops[j][0])) for j in range(m)] for i in range(n)]
+    dp = [[0.0] * (m + 1) for _ in range(n + 1)]
+    for i in range(1, n + 1):
+        for j in range(1, m + 1):
+            v = dp[i - 1][j - 1] + sm[i - 1][j - 1] if sm[i - 1][j - 1] else 0.0
+            dp[i][j] = max(dp[i - 1][j], dp[i][j - 1], v)
+    i, j, pairs = n, m, []
+    while i > 0 and j > 0:
+        if sm[i - 1][j - 1] and abs(dp[i][j] - (dp[i - 1][j - 1] + sm[i - 1][j - 1])) < 1e-9:
+            pairs.append((i - 1, j - 1))
+            i, j = i - 1, j - 1
+        elif dp[i][j] == dp[i - 1][j]:
+            i -= 1
+        else:
+            j -= 1
+    pairs.reverse()
+    return dp[n][m], pairs
+
+
+def trova_relazione(lid, nomi, rel):
+    best = None
+    for r in rel:
+        if norm_ref(r["ref"]) != norm_ref(lid) or len(r["g"]) < 2:
+            continue
+        sc, pairs = allinea(nomi, r["st"])
+        if len(pairs) >= max(2, int(0.4 * len(nomi) + 0.5)) and (best is None or sc > best[0]):
+            best = (sc, r, pairs)
+    return best
+
+
+def percorso_da_osm(l, nomi, rel, coord, manuali):
+    b = trova_relazione(l["id"], nomi, rel)
+    if not b:
+        return None
+    sc, r, pairs = b
+    P = [tuple(x) for x in r["g"]]
+    ll = [None] * len(nomi)
+    for i, j in pairs:
+        ll[i] = (r["st"][j][1], r["st"][j][2])
+    idx = mappa_fermate(P, ll)
+    for i, j in pairs:                                # posizione esatta della fermata (sul bordo della strada)
+        if nomi[i] not in manuali:
+            coord[nomi[i]] = [round(r["st"][j][2], 5), round(r["st"][j][1], 5)]
+    nuove_p, m = semplifica(P, [i for i in idx if i is not None], tol=2.5)
+    return {"g": nuove_p, "s": [m[i] if i is not None else None for i in idx], "q": 1 if r["rot"] == 0 else 0, "src": "osm"}
+
+
+def angolo(a, b, c):
+    v1, v2 = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+    n = math.hypot(*v1) * math.hypot(*v2)
+    return 0 if n == 0 else math.degrees(math.acos(max(-1, min(1, (v1[0] * v2[0] + v1[1] * v2[1]) / n))))
+
+
+def affidabile(g, s, ll):
+    """Controlla un tracciato calcolato: niente deviazioni enormi, niente inversioni a U, fermate vicine al tracciato."""
+    cum = [0.0]
+    for i in range(1, len(g)):
+        cum.append(cum[-1] + dist_m(g[i - 1], g[i]))
+    dev = 0
+    for q in range(1, len(s)):
+        a, b = s[q - 1], s[q]
+        if a is None or b is None or b <= a or b >= len(g):
+            continue
+        retto, lungo = dist_m(g[a], g[b]), cum[b] - cum[a]
+        if retto > 80 and lungo / retto > 2.2 and lungo - retto > 400:
+            dev += 1
+    spunti = sum(1 for i in range(1, len(g) - 1) if angolo(g[i - 1], g[i], g[i + 1]) > 150)
+    off = max([dist_m(ll[q], g[s[q]]) for q in range(len(s)) if ll[q] and s[q] is not None and s[q] < len(g)] or [0])
+    return dev == 0 and spunti <= 1 and off < 120
+
+
 def aggiorna_percorsi(dati, report):
     try:
         prec = json.load(open("percorsi.json", encoding="utf-8")).get("p", {})
     except Exception:
         prec = {}
-    coord = dati.get("fermate", {})
-    perc, usate, chiamate, errori, nuovi = {}, set(), [0], 0, 0
+    try:
+        manuali = json.load(open("fermate_manuali.json", encoding="utf-8"))
+    except Exception:
+        manuali = {}
+    rel = []
+    try:
+        rel = carica_relazioni(report)
+    except Exception as e:
+        report.append("  linee OpenStreetMap non utilizzabili: %s" % e)
+    coord = dati.setdefault("fermate", {})
+    perc, usate, chiamate, errori = {}, set(), [0], 0
+    cont = collections.Counter()
+    trovate, no_osm = set(), set()
     for l in dati["linee"]:
         nomi = [st[0] for st in l["f"]]
         k = chiave_perc(nomi)
         l["rk"] = k
         usate.add(k)
-        if k in prec:
-            perc[k] = prec[k]
+        if k in perc:
             continue
-        if k in perc or chiamate[0] >= MAX_RICHIESTE_PERC or errori >= 5 or l.get("amb"):
+        r = percorso_da_osm(l, nomi, rel, coord, manuali) if rel else None
+        if r:
+            perc[k] = r
+            cont["osm"] += 1
+            trovate.add(l["id"])
+            continue
+        no_osm.add(l["id"])
+        v = prec.get(k)
+        if v and v.get("src") == "osrm" and "q" in v:
+            perc[k] = v
+            cont["calcolati"] += 1
+            continue
+        if l.get("amb") or chiamate[0] >= MAX_RICHIESTE_PERC or errori >= 5:
+            cont["da_calcolare"] += 1
             continue
         ll = [tuple(coord[n][::-1]) if coord.get(n) else None for n in nomi]
-        pts = [p for i, p in enumerate(ll) if p and (i == 0 or p != ll[i - 1])]
+        pts = [x for i, x in enumerate(ll) if x and (i == 0 or x != ll[i - 1])]
         if len(pts) < 2:
             continue
         try:
             P = percorso_completo(pts, chiamate)
             idx = mappa_fermate(P, ll)
+            ok = affidabile(P, idx, ll)
             nuove_p, m = semplifica(P, [i for i in idx if i is not None])
-            perc[k] = {"g": nuove_p, "s": [m[i] if i is not None else None for i in idx]}
-            nuovi += 1
+            perc[k] = {"g": nuove_p, "s": [m[i] if i is not None else None for i in idx], "q": 1 if ok else 0, "src": "osrm"}
+            cont["calcolati"] += 1
         except Exception as e:
             errori += 1
             report.append("  percorso non riuscito per linea %s: %s" % (l["id"], e))
-    json.dump({"v": 1, "p": {k: v for k, v in perc.items() if k in usate}},
-              open("percorsi.json", "w", encoding="utf-8"), separators=(",", ":"))
-    mancano = len({l["rk"] for l in dati["linee"] if l["rk"] not in perc and not l.get("amb")})
-    report.append("Percorsi su strada: %d pronti, %d nuovi ora, %d ancora da calcolare (linee ambigue escluse)" % (len(perc), nuovi, mancano))
+    json.dump({"v": 2, "p": {k: v for k, v in perc.items() if k in usate}}, open("percorsi.json", "w", encoding="utf-8"), separators=(",", ":"))
+    buoni = sum(1 for v in perc.values() if v.get("q"))
+    report.append("Percorsi: %d da OpenStreetMap (esatti) | %d calcolati | %d ancora da calcolare | affidabili in tutto: %d su %d"
+                  % (cont["osm"], cont["calcolati"], cont["da_calcolare"], buoni, len(perc)))
+    report.append("  linee con tracciato OpenStreetMap: %s" % ", ".join(sorted(trovate)))
+    report.append("  linee SENZA tracciato OpenStreetMap: %s" % ", ".join(sorted(no_osm - trovate)))
 
-
-def aggiorna_osm_stops(report):
-    """Salva tutte le fermate bus di OpenStreetMap (anche quelle assenti dagli orari PDF) per mostrarle sulla mappa."""
-    try:
-        v = json.load(open("fermate_osm.json", encoding="utf-8"))
-        if time.time() - v.get("t", 0) < 20 * 86400 and v.get("s") and v.get("q") == 2:
-            return
-    except Exception:
-        pass
-    try:
-        osm = fermate_osm()
-    except Exception as e:
-        report.append("Fermate OpenStreetMap non scaricate (%s): riprovo al prossimo giro" % e)
-        return
-    if not osm:
-        report.append("Fermate OpenStreetMap non scaricate (elenco vuoto): riprovo al prossimo giro")
-        return
-    json.dump({"t": int(time.time()), "q": 2, "s": [[round(lo, 5), round(la, 5), nm] for la, lo, nm in osm]},
-              open("fermate_osm.json", "w", encoding="utf-8"), ensure_ascii=False, separators=(",", ":"))
-    report.append("Fermate OpenStreetMap salvate per la mappa: %d" % len(osm))
 
 # ====================== AVVISI ======================
 def costruisci_avvisi(report):

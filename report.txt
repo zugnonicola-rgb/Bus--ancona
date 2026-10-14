@@ -1,4 +1,4 @@
-Aggiornato: 2026-10-14 04:40 UTC | linee: 359 | avvisi: 6
+Aggiornato: 2026-10-14 08:35 UTC | linee: 359 | avvisi: 6
 urbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/10/AnconaFerialeInvernalescolastico1102026.pdf
   linee/direzioni lette: 53
 extraurbano | Feriale invernale (scuole aperte) | https://www.conerobus.it/wp-content/uploads/2026/09/extraurbanoconeroferialescolastico14_09_2026.pdf
@@ -36,4 +36,8 @@ urbano | Festivo estivo | https://www.conerobus.it/wp-content/uploads/2026/06/An
 Fermate senza posizione risolte dal nome su OpenStreetMap: 0 su 32
 Fermate con posizione: 451/483 (cercate ora: 0, trovate: 0)
   senza posizione (32): Acquaviva Semaforo; Barcaglione Carcere; Borghetto Centro; C.Ferretti Biv. Autostrada; Collina Centro; Crocette Centro; Distributore Carrefour; Grancetta Centro; Moie (Cimitero)r; Monsano (Centro)r; Monte Varino (Bivio); Montoro Centro; Montorso Centro; Padiglione Distributore Ip; Paterno Centro; Poggio Alto; Poggio Paese; Poggio costa - Inizio salita; Pontemagno (r); Portonovo Baia; Portorecanati And; RecanatiI (Squartabue); Rustico Centro; S.Rocchetto Centro; STAFFOLO (Casa Marchegiani); Sant` Amico; Senigallia Cap. ( Conerobus ); Sogemi; Terminal Biglietterie; Via M.Fanese - Passatempo Cent; Viale N. Sauro - Ist.To Mattei; Villaggio Barcaglione
-Percorsi su strada: 226 pronti, 0 nuovi ora, 0 ancora da calcolare (linee ambigue escluse)
+Linee Conerobus da OpenStreetMap scaricate: 54 (con tracciato continuo: 54)
+Percorsi: 124 da OpenStreetMap (esatti) | 104 calcolati | 3 ancora da calcolare | affidabili in tutto: 133 su 228
+  linee con tracciato OpenStreetMap: 1/3, 1/5, 11, 12, 2, 2/6, 22, 24, 3, 30, 31, 34, 35, 41, 42, 44, 6, 7, 8, 91, 92, B, C, C.D., C.S.
+  linee SENZA tracciato OpenStreetMap: 1/4, 10, 21, 21/33, 33, 36, 37, 4, 40, 43, 46, 46/, 65, 89, 93, 94, A, D, E, F, H, I, J, JEX1, L, M, N, O, P, Q, R, R/ e 24, T
+ERRORE nella fase 'fermate OpenStreetMap': name 'aggiorna_osm_stops' is not defined

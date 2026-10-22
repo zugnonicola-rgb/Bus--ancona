@@ -173,7 +173,7 @@ label.chk input:checked{background:#34c759}label.chk input:checked::after{transf
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="fav" hidden aria-label="Fermata preferita">☆</button><button id="chiudi" aria-label="Chiudi">✕</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><label class="chk"><input type="checkbox" id="bus"> Mostra i bus stimati sulla mappa</label><label class="chk"><input type="checkbox" id="occl"> Bus nascosti dietro gli edifici (con la mappa inclinata)</label><p class="hint">Posizioni stimate dagli orari di tabella, non in tempo reale. Non attivi in modalità leggera.</p><p class="hint" id="diag"></p></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><label class="chk"><input type="checkbox" id="bus"> Mostra i bus stimati sulla mappa</label><label class="chk"><input type="checkbox" id="occl"> Bus più scuri dietro gli edifici (con la mappa inclinata)</label><p class="hint">Posizioni stimate dagli orari di tabella, non in tempo reale. Non attivi in modalità leggera.</p><p class="hint" id="diag"></p><p class="hint" id="diag2"></p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Chiudi</button></dialog>
@@ -482,6 +482,75 @@ function disegnaSprite(ctx,x,y,angDeg,mpp,pitch,alpha,colore){
    ctx.globalCompositeOperation="multiply";ctx.drawImage(TNT,0,0,ATL.SPR,ATL.SPR,dx,dy,d,d);ctx.globalCompositeOperation="source-over"}};
  if(alpha<.99)un(f>.5?h1:h0,alpha);else if(f<.04)un(h0,1);else if(f>.96)un(h1,1);else{un(h0,1);un(h1,f)}   // dissolvenza: la rotazione nelle curve e' continua
  ctx.globalAlpha=1}
+// ===== Bus 3D in tempo reale (WebGL): il modello ruota in modo continuo, come una pedina =====
+function creaBusGL(gl,buf){
+ const dv=new DataView(buf),N=dv.getUint32(0,true);let o=4;
+ const pos=new Int16Array(buf.slice(o,o+N*6));o+=N*6;const nrm=new Int8Array(buf.slice(o,o+N*3));o+=N*3;const col=new Uint8Array(buf.slice(o,o+N*3));o+=N*3;const fl=new Uint8Array(buf.slice(o,o+N*3));
+ const sh=(t,src)=>{const s=gl.createShader(t);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw new Error(gl.getShaderInfoLog(s));return s};
+ const prog=(vs,fs)=>{const p=gl.createProgram();gl.attachShader(p,sh(gl.VERTEX_SHADER,vs));gl.attachShader(p,sh(gl.FRAGMENT_SHADER,fs));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error(gl.getProgramInfoLog(p));return p};
+ const P=prog(`attribute vec3 a_pos;attribute vec3 a_nrm;attribute vec3 a_col;attribute vec3 a_fl;
+uniform vec2 u_off,u_scr;uniform float u_s,u_yaw,u_ct,u_st;varying vec3 v_n,v_col,v_fl;
+void main(){vec3 p=a_pos*0.001;float cy=cos(u_yaw),sy=sin(u_yaw);vec3 w=vec3(p.x*cy+p.y*sy,-p.x*sy+p.y*cy,p.z);vec3 n=normalize(a_nrm);
+ v_n=vec3(n.x*cy+n.y*sy,-n.x*sy+n.y*cy,n.z);float up=w.y*u_ct+w.z*u_st,h=w.z*u_ct-w.y*u_st;vec2 px=u_off+vec2(w.x*u_s,-up*u_s);
+ gl_Position=vec4(px.x/u_scr.x*2.0-1.0,1.0-px.y/u_scr.y*2.0,-h*0.02,1.0);v_col=a_col;v_fl=a_fl;}`,
+ `precision mediump float;varying vec3 v_n,v_col,v_fl;uniform vec3 u_L,u_V,u_H,u_tint;uniform float u_on,u_dark,u_alpha;
+void main(){vec3 n=normalize(v_n);float dif=max(dot(n,u_L),0.0),amb=0.5+0.16*n.z,sp=pow(max(dot(n,u_H),0.0),40.0)*v_fl.z*0.8,k=amb+0.62*dif;
+ vec3 b=v_col;if(v_fl.x>0.5)b=mix(b,b*u_tint,u_on);float rim=1.0-max(dot(n,u_V),0.0);
+ vec3 c=b*k+vec3(sp)+v_fl.y*b*0.5;c=min(c,vec3(1.0))*(1.0-0.22*rim*rim)*u_dark;gl_FragColor=vec4(c*u_alpha,u_alpha);}`);
+ const Q=prog(`attribute vec2 a_p;attribute vec2 a_t;uniform vec2 u_off,u_scr;uniform float u_s,u_yaw,u_ct;varying vec2 v_t;
+void main(){float cy=cos(u_yaw),sy=sin(u_yaw);vec2 w=vec2(a_p.x*cy+a_p.y*sy,-a_p.x*sy+a_p.y*cy);vec2 px=u_off+vec2(w.x*u_s,-w.y*u_ct*u_s);
+ gl_Position=vec4(px.x/u_scr.x*2.0-1.0,1.0-px.y/u_scr.y*2.0,0.0,1.0);v_t=a_t;}`,
+ `precision mediump float;varying vec2 v_t;uniform sampler2D u_tex;uniform float u_a;void main(){float a=texture2D(u_tex,v_t).a*u_a;gl_FragColor=vec4(0.0,0.0,0.0,a);}`);
+ const buffer=(data)=>{const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);return b};
+ const bP=buffer(pos),bN=buffer(nrm),bC=buffer(col),bF=buffer(fl);
+ // ombra: un rettangolo con i bordi sfumati (texture calcolata, niente immagini)
+ const TW=32,TH=96,td=new Uint8Array(TW*TH*4);
+ for(let y=0;y<TH;y++)for(let x=0;x<TW;x++){const u=(x+.5)/TW*2-1,v=(y+.5)/TH*2-1,dx=Math.max(Math.abs(u)-.55,0),dy=Math.max(Math.abs(v)-.82,0),d=Math.hypot(dx/.45,dy/.18),a=Math.max(0,1-d);const i=(y*TW+x)*4;td[i+3]=Math.round(255*a*a*(3-2*a))}
+ const tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,tex);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,TW,TH,0,gl.RGBA,gl.UNSIGNED_BYTE,td);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ const quad=buffer(new Float32Array([-1.9,-7.4,0,0, 1.9,-7.4,1,0, -1.9,7.4,0,1, 1.9,-7.4,1,0, 1.9,7.4,1,1, -1.9,7.4,0,1].map((v,i)=>i%4<2?v:v)));
+ const U=(p,n)=>gl.getUniformLocation(p,n),A=(p,n)=>gl.getAttribLocation(p,n);
+ const u={off:U(P,"u_off"),scr:U(P,"u_scr"),s:U(P,"u_s"),yaw:U(P,"u_yaw"),ct:U(P,"u_ct"),st:U(P,"u_st"),L:U(P,"u_L"),V:U(P,"u_V"),H:U(P,"u_H"),tint:U(P,"u_tint"),on:U(P,"u_on"),dark:U(P,"u_dark"),alpha:U(P,"u_alpha")};
+ const q={off:U(Q,"u_off"),scr:U(Q,"u_scr"),s:U(Q,"u_s"),yaw:U(Q,"u_yaw"),ct:U(Q,"u_ct"),tex:U(Q,"u_tex"),a:U(Q,"u_a")};
+ const nz=v=>{const l=Math.hypot(...v);return v.map(x=>x/l)};
+ // buses: [{x,y,s,yaw (rad),tint:[r,g,b]|null,dark,alpha}] dal piu' lontano al piu' vicino; W,H in px CSS; tilt in radianti
+ function draw(buses,W,H,tilt,dpr){
+  gl.viewport(0,0,Math.round(W*dpr),Math.round(H*dpr));gl.clearColor(0,0,0,0);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+  if(!buses.length)return;
+  const ct=Math.cos(tilt),st=Math.sin(tilt),L=nz([-.45,.30,.84]),V=[0,-st,ct],Hh=nz([L[0]+V[0],L[1]+V[1],L[2]+V[2]]);
+  gl.enable(gl.BLEND);gl.blendFunc(gl.ONE,gl.ONE_MINUS_SRC_ALPHA);
+  for(const b of buses){
+   // ombra a terra (la luce arriva da sinistra in alto: l'ombra cade a destra, in basso)
+   gl.disable(gl.DEPTH_TEST);gl.useProgram(Q);gl.bindBuffer(gl.ARRAY_BUFFER,quad);
+   const ap=A(Q,"a_p"),at=A(Q,"a_t");gl.enableVertexAttribArray(ap);gl.enableVertexAttribArray(at);gl.vertexAttribPointer(ap,2,gl.FLOAT,false,16,0);gl.vertexAttribPointer(at,2,gl.FLOAT,false,16,8);
+   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,tex);gl.uniform1i(q.tex,0);
+   gl.uniform2f(q.scr,W,H);gl.uniform1f(q.s,b.s);gl.uniform1f(q.ct,ct);gl.uniform1f(q.a,.34*b.alpha);
+   // lo spostamento dell'ombra e' fissato nello spazio dello schermo: lo ruoto al contrario della direzione del bus
+   gl.uniform1f(q.yaw,b.yaw);gl.uniform2f(q.off,b.x+b.s*.95,b.y+b.s*.55*ct);gl.drawArrays(gl.TRIANGLES,0,6);
+   gl.disableVertexAttribArray(ap);gl.disableVertexAttribArray(at);
+   // il bus
+   gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LESS);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(P);
+   for(const [loc,buf,sz,type,norm] of [["a_pos",bP,3,gl.SHORT,false],["a_nrm",bN,3,gl.BYTE,true],["a_col",bC,3,gl.UNSIGNED_BYTE,true],["a_fl",bF,3,gl.UNSIGNED_BYTE,true]]){
+    const l=A(P,loc);gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.enableVertexAttribArray(l);gl.vertexAttribPointer(l,sz,type,norm,0,0)}
+   gl.uniform2f(u.off,b.x,b.y);gl.uniform2f(u.scr,W,H);gl.uniform1f(u.s,b.s);gl.uniform1f(u.yaw,b.yaw);gl.uniform1f(u.ct,ct);gl.uniform1f(u.st,st);
+   gl.uniform3f(u.L,L[0],L[1],L[2]);gl.uniform3f(u.V,V[0],V[1],V[2]);gl.uniform3f(u.H,Hh[0],Hh[1],Hh[2]);
+   const t=b.tint||[1,1,1];gl.uniform3f(u.tint,t[0],t[1],t[2]);gl.uniform1f(u.on,b.tint?1:0);gl.uniform1f(u.dark,b.dark==null?1:b.dark);gl.uniform1f(u.alpha,b.alpha==null?1:b.alpha);
+   gl.drawArrays(gl.TRIANGLES,0,N);
+   for(const l of ["a_pos","a_nrm","a_col","a_fl"])gl.disableVertexAttribArray(A(P,l))}
+ }
+ return {draw,N}}
+
+
+const BG={cv:null,gl:null,r:null,stato:"",sporco:false,n:0};
+function bgInit(){if(BG.stato||!MAP)return;BG.stato="carico";
+ try{const cv=document.createElement("canvas");cv.id="bg";cv.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
+  const gl=cv.getContext("webgl",{alpha:true,premultipliedAlpha:true,antialias:true})||cv.getContext("experimental-webgl");if(!gl)throw new Error("WebGL assente");
+  fetch("bus-model.bin").then(r=>{if(!r.ok)throw new Error("modello non trovato");return r.arrayBuffer()}).then(ab=>{BG.r=creaBusGL(gl,ab);BG.cv=cv;BG.gl=gl;MAP.getCanvasContainer().appendChild(cv);
+   cv.addEventListener("webglcontextlost",e=>{e.preventDefault();BG.stato="fallito: contesto perso"});BG.stato="ok"}).catch(e=>{BG.stato="fallito: "+(e&&e.message||e)})}
+ catch(e){BG.stato="fallito: "+(e&&e.message||e)}}
+const colRgb=id=>{const h=hue(id)/360,s=.62,l=.4,q=l<.5?l*(1+s):l+s-l*s,p=2*l-q,f=t=>{t=(t+1)%1;return t<1/6?p+(q-p)*6*t:t<.5?q:t<2/3?p+(q-p)*(2/3-t)*6:p};return [f(h+1/3),f(h),f(h-1/3)]};
+function dentro(pt,g){const ring=(r)=>{let c=false;for(let i=0,j=r.length-1;i<r.length;j=i++){const a=r[i],b=r[j];if((a[1]>pt[1])!==(b[1]>pt[1])&&pt[0]<(b[0]-a[0])*(pt[1]-a[1])/(b[1]-a[1])+a[0])c=!c}return c};
+ const poly=P=>ring(P[0])&&!P.slice(1).some(ring);return g.type==="Polygon"?poly(g.coordinates):g.type==="MultiPolygon"?g.coordinates.some(poly):false}
 let SELBUS=false,ATTIVI=[],ULTAGG=-1e9,ULTDIS=0,BC=null,BX=null,BPOS=[],BSET=new Map(),BSH=null,BBR=new Map();
 function ptM(g,m){const c=g.cum,P=g.P;m=Math.max(0,Math.min(m,c[c.length-1]));let lo=0,hi=c.length-1;while(hi-lo>1){const mid=(lo+hi)>>1;if(c[mid]<=m)lo=mid;else hi=mid}
  const f=Math.min(1,Math.max(0,(m-c[lo])/((c[hi]-c[lo])||1))),a=P[lo],b=P[hi];return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]}
@@ -499,11 +568,14 @@ function setPer(k,pelle,tetto,frena){const kk=k+(frena?"!":"");let x=BSET.get(kk
 function bcInit(){if(BC||!MAP)return;BC=document.createElement("canvas");BC.id="bc";BC.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none";
  MAP.getCanvasContainer().appendChild(BC);BX=BC.getContext("2d");BSH=ombra(fabbrica)}
 function disegnaTutti(){
- if(!BUSON||!MAP||!PRONTA||!PERC||document.hidden)return;bcInit();
+ if(!BUSON||!MAP||!PRONTA||!PERC||document.hidden)return;bcInit();bgInit();
  const selB=mapLine!==""&&TRIP!=null,cv=MAP.getCanvas(),W=cv.clientWidth,H=cv.clientHeight,dpr=Math.min(window.devicePixelRatio||1,2);
  if(BC.width!==Math.round(W*dpr)||BC.height!==Math.round(H*dpr)){BC.width=Math.round(W*dpr);BC.height=Math.round(H*dpr)}
- BX.setTransform(dpr,0,0,dpr,0,0);BX.clearRect(0,0,W,H);BPOS=[];if(tab&&!selB)return;
- const now=performance.now();if(now-ULTAGG>1000){ULTAGG=now;aggiornaAttivi();aggiornaStato()}
+ const g3=BG.stato==="ok";if(g3&&(BG.cv.width!==Math.round(W*dpr)||BG.cv.height!==Math.round(H*dpr))){BG.cv.width=Math.round(W*dpr);BG.cv.height=Math.round(H*dpr)}
+ BX.setTransform(dpr,0,0,dpr,0,0);BX.clearRect(0,0,W,H);BPOS=[];
+ const vuota=()=>{if(g3&&BG.sporco){BG.r.draw([],W,H,0,dpr);BG.sporco=false}};
+ if(tab&&!selB){vuota();return}
+ const now=performance.now();if(now-ULTAGG>1000){ULTAGG=now;aggiornaAttivi();aggiornaStato();const e2=$("#diag2");if(e2)e2.textContent="Bus: "+(BG.stato==="ok"?"modello 3D in tempo reale ("+BG.n+" in scena)":BG.stato?"immagini di ripiego ("+BG.stato+")":"avvio")}
  const nowT=performance.now(),kd=1-Math.exp(-Math.min(.1,Math.max(0,(nowT-ULTFR)/1000))/.12);ULTFR=nowT;
  const T=adessoMin(),z=MAP.getZoom(),pitch=MAP.getPitch(),rot=MAP.getBearing(),dots=z<15.2,mpp=78271.5*Math.cos(43.6*Math.PI/180)/Math.pow(2,z),v=[];
  for(const a of ATTIVI){if(z<12.5&&!a.sel)continue;const p=a.sel?posSel(a.tr,T):posAt(a.tr,T);if(!p)continue;
@@ -511,17 +583,23 @@ function disegnaTutti(){
   let br=BBR.get(a.key);br=br==null?q.br:br+((q.br-br+540)%360-180)*kd;BBR.set(a.key,br);v.push({a,p,x:xy.x,y:xy.y,ang:br-rot})}
  v.sort((m,n)=>(m.a.sel-n.a.sel)||(m.y-n.y));
  const lpx=Math.max(12/mpp,28),lift=3.3/mpp*Math.sin(Math.max(pitch,22)*Math.PI/180)*.5,OFF=[-4.8,-2.4,0,2.4,4.8],occ=OCCL&&!dots&&pitch>=12&&EDIFICI.length>0;let budget=6;
- if(occ)for(const b of v){const k=b.a.key;let c=OC.get(k);if((!c||nowT-c.t>180)&&budget>0){budget--;const h=[];
-   for(const o of OFF){const xy=MAP.project(ptM(b.a.g,b.p.m+o));let hid=false;try{hid=MAP.queryRenderedFeatures([[xy.x-2,xy.y-2],[xy.x+2,xy.y+2]],{layers:EDIFICI}).length>0}catch(e){OCCL=false}h.push(hid)}
-   c={t:nowT,h};OC.set(k,c)}b.h=c?c.h:null}
+ if(occ)for(const b of v){const k=b.a.key;let c=OC.get(k);if(!c){c={t:-1e9,h:[],dk:1};OC.set(k,c)}
+  if(nowT-c.t>180&&budget>0){budget--;c.t=nowT;c.h=[];
+   for(const o of OFF){const ll=ptM(b.a.g,b.p.m+o),xy=MAP.project(ll);let hid=false;
+    try{hid=MAP.queryRenderedFeatures([[xy.x-2,xy.y-2],[xy.x+2,xy.y+2]],{layers:EDIFICI}).some(f=>{const pr=f.properties||{};if(pr.render_height!=null&&pr.render_height<6)return false;return !(f.geometry&&dentro(ll,f.geometry))})}catch(e){OCCL=false}
+    c.h.push(hid)}}
+  const target=c.h.filter(Boolean).length>=3?.55:1;c.dk+=(target-c.dk)*(1-Math.exp(-Math.min(.1,Math.max(0,(nowT-(c.u||nowT))/1000))/.15));c.u=nowT;b.dk=c.dk}
+ const l3=[];
  for(const b of v){const a=b.a,colr=col(a.l.id),al=a.dim?.3:b.p.st==="w"?.88:1;
   if(dots){BX.globalAlpha=al;BX.beginPath();BX.arc(b.x,b.y,a.hl?7:5,0,6.3);BX.fillStyle=a.hl?colr:"#fff";BX.shadowColor="rgba(0,0,0,.35)";BX.shadowBlur=4;BX.fill();BX.shadowBlur=0;BX.lineWidth=2;BX.strokeStyle=a.hl?"#fff":"#5b6b76";BX.stroke();BX.globalAlpha=1}
-  else if(ATL.ok){disegnaSprite(BX,b.x,b.y,b.ang,mpp,pitch,al,a.hl?colr:null)}
+  else if(g3){l3.push({x:b.x,y:b.y,s:Math.max(1/mpp,28/12)*BUSK,yaw:b.ang*Math.PI/180,tint:a.hl?colRgb(a.l.id):null,dark:b.dk==null?1:b.dk,alpha:al});BG.sporco=true}
+  else if(ATL.ok){disegnaSprite(BX,b.x,b.y,b.ang,mpp,pitch,al,a.hl?colr:null);
+   if(b.dk!=null&&b.dk<.99){const d=ATL.SPR*Math.max(1/mpp,28/12)*BUSK/ATL.PXM;BX.globalCompositeOperation="source-atop";BX.fillStyle="rgba(0,0,0,"+((1-b.dk)*.9)+")";BX.fillRect(b.x-d/2,b.y-d*.58,d,d);BX.globalCompositeOperation="source-over"}}
   else{const set=a.hl?setPer("c"+a.l.id,colr,colr,b.p.st==="r"&&b.p.v<.8):setPer("w","#eef2f4","#ffffff",b.p.st==="r"&&b.p.v<.8);
    disegnaBus(BX,set,BSH,b.x,b.y,b.ang,mpp,pitch,al,dpr)}
-  let nasc=0;if(b.h&&b.h.some(Boolean)){const rx=Math.max(9,2.4/mpp*BUSK*.9),ry=Math.max(13,lpx*BUSK*.32);BX.globalCompositeOperation="destination-out";BX.fillStyle="#000";
-   for(let i=0;i<OFF.length;i++)if(b.h[i]){nasc++;const xy=MAP.project(ptM(a.g,b.p.m+OFF[i]));BX.beginPath();BX.ellipse(xy.x,xy.y-lift*.9,rx,ry,0,0,6.3);BX.fill()}BX.globalCompositeOperation="source-over"}
-  if(nasc<OFF.length)BPOS.push({x:b.x,cy:b.y-(dots?0:lift),r:dots?18:Math.max(22,lpx*BUSK*.55),li:a.li,k:a.tr.k})}}
+  const nasc=0;
+  if(nasc<OFF.length)BPOS.push({x:b.x,cy:b.y-(dots?0:lift),r:dots?18:Math.max(22,lpx*BUSK*.55),li:a.li,k:a.tr.k})}
+ if(g3){BG.r.draw(l3,W,H,Math.max(18,pitch)*Math.PI/180,dpr);BG.n=l3.length}}
 function loopBus(){requestAnimationFrame(loopBus);const t=performance.now();if(t-ULTDIS>10){ULTDIS=t;disegnaTutti()}}
 requestAnimationFrame(loopBus);
 function selezionaBus(li,k){const l=ATT[li],g=geo(l),tr=g&&trips(l).find(t=>t.k===k);if(!tr)return;const p=posSel(tr,adessoMin());

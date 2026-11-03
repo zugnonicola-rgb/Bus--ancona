@@ -33,7 +33,7 @@ dialog{border:0;border-radius:12px;padding:16px;max-width:92vw;width:440px;backg
 dialog::backdrop{background:rgba(0,0,0,.55)}
 dialog button{margin-top:12px;width:100%;padding:12px;border:0;border-radius:8px;background:var(--acc);color:var(--on);font:inherit;font-weight:700}
 
-html,body{height:100%;overflow:hidden}
+html,body{position:fixed;inset:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none}
 #map{position:fixed;left:0;right:0;top:0;bottom:calc(58px + env(safe-area-inset-bottom,0px));background:var(--bg)}
 #bar{position:fixed;left:0;right:0;bottom:0;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px);z-index:1000}
 #bar button{flex:1;border:0;background:none;color:var(--mute);font:inherit;font-size:12px;padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:2px}
@@ -157,6 +157,18 @@ label.chk input:checked{background:#34c759}label.chk input:checked::after{transf
 .maplibregl-ctrl-group button{width:38px;height:38px}
 .maplibregl-ctrl-bottom-right,.maplibregl-ctrl-bottom-left{bottom:calc(env(safe-area-inset-bottom,0px) + 76px)}
 .fs,#fav{color:#ff9f0a}
+#sheet.tp{top:calc(env(safe-area-inset-top,0px) + 8px);bottom:auto;max-height:calc(var(--vvh,100vh) - env(safe-area-inset-top,0px) - 16px)}
+#orab{display:flex;gap:6px;align-items:center;margin:0 0 8px}
+#orab[hidden]{display:none}
+#orab .oi{font-size:16px}
+#orab input,#orab select{width:auto;padding:7px 10px;font-size:15px;border-radius:11px}
+#orab input{width:96px}#orab select{flex:1;min-width:0}
+#orab .mini{border:0;background:rgba(0,122,255,.12);color:var(--acc);border-radius:11px;padding:8px 12px;font:inherit;font-weight:600;font-size:14px}
+#sug{margin-top:6px;border-radius:16px;overflow:hidden;background:var(--card)}
+#sug:empty{display:none}
+.sg{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-top:.5px solid var(--sep);background:none;padding:12px 14px;font:inherit;font-size:16px;color:var(--ink);text-align:left}
+.sg:first-child{border-top:0}.sg small{color:var(--mute);font-size:13px;margin-left:10px;white-space:nowrap}
+.sgh,.sgv{padding:10px 14px;color:var(--mute);font-size:13px}
 </style>
 </head>
 <body>
@@ -172,8 +184,9 @@ label.chk input:checked{background:#34c759}label.chk input:checked::after{transf
 </nav>
 <section id="sheet" hidden>
 <div class="sh"><strong id="stit"></strong><button id="fav" hidden aria-label="Fermata preferita">☆</button><button id="chiudi" aria-label="Chiudi">✕</button></div>
+<div id="orab"><span class="oi">🕐</span><input id="ora" type="time" value="08:00" aria-label="Orario"><select id="per" aria-label="Tipo di orario"></select><button class="mini" id="adesso" type="button">Adesso</button></div>
 <div id="vista"></div>
-<div id="imp" hidden><div class="nota" id="nota"></div><label for="per">Tipo di orario</label><select id="per"></select><label for="ora">Orario di riferimento</label><input id="ora" type="time" value="08:00"><button class="btn" id="adesso">Usa l'ora attuale</button><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><label class="chk"><input type="checkbox" id="bus"> Mostra i bus stimati sulla mappa</label><label class="chk"><input type="checkbox" id="occl"> Bus più scuri dietro gli edifici (con la mappa inclinata)</label><p class="hint">Posizioni stimate dagli orari di tabella, non in tempo reale. Non attivi in modalità leggera.</p><p class="hint" id="diag"></p><p class="hint" id="diag2"></p></div>
+<div id="imp" hidden><div class="nota" id="nota"></div><p class="hint">L'orario e il tipo di orario (feriale, festivo, estivo) si cambiano in alto, nelle schermate Fermata, Linea e Da A a B.</p><label>Fermate preferite (compaiono nella schermata iniziale)</label><div class="chips" id="pstops"></div><label>Linee preferite (compaiono per prime)</label><div class="chips" id="prefs"></div><label for="stile">Aspetto della mappa</label><select id="stile"><option value="auto">Automatico (chiaro/scuro)</option><option value="liberty">Standard (con edifici 3D)</option><option value="positron">Chiara minimale</option><option value="bright">Colorata</option><option value="dark">Scura</option></select><label class="chk" style="margin-top:12px"><input type="checkbox" id="legg"> Modalità leggera (niente 3D, più fluida)</label><label class="chk"><input type="checkbox" id="bus"> Mostra i bus stimati sulla mappa</label><label class="chk"><input type="checkbox" id="occl"> Bus più scuri dietro gli edifici (con la mappa inclinata)</label><p class="hint">Posizioni stimate dagli orari di tabella, non in tempo reale. Non attivi in modalità leggera.</p><p class="hint" id="diag"></p><p class="hint" id="diag2"></p></div>
 </section>
 
 <dialog id="pop"><h2 style="margin-top:0">Avvisi sulle tue linee</h2><div id="avv"></div><button id="ok">Chiudi</button></dialog>
@@ -219,9 +232,25 @@ const setOra=()=>{const d=new Date();$("#ora").value=String(d.getHours()).padSta
 const tra=t=>{if(oraManuale)return"";const m=mins(t)-adesso();return m<=0?"in partenza":m<60?`tra ${m} min`:""};
 function warn(l){const a=DATA.avvisi.filter(x=>x.linee.includes(l.id)||x.linee.includes("*"));
  return a.map(x=>`<p class="w">⚠ Non certo: ${esc(x.titolo)}. <a href="${esc(x.link)}" target="_blank" rel="noopener">Vedi la fonte</a></p>`).join("")}
-let nomi=[],lista="",IDX={};
+let nomi=[],lista="",IDX={},NMAP=[],REC=[];
+try{REC=JSON.parse(localStorage.getItem("recenti")||"[]")}catch(e){}
+const norm=t=>t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+function ricorda(n){REC=[n,...REC.filter(x=>x!==n)].slice(0,8);try{localStorage.setItem("recenti",JSON.stringify(REC))}catch(e){}}
+// completamento: ogni parola scritta deve essere l'inizio di una parola del nome ("piazza r" -> Piazza Roma)
+function suggerisci(q,max){max=max||6;const qt=norm(q).split(" ").filter(Boolean),out=[];
+ if(!qt.length){const v=[];for(const n of [...FS,...REC])if(IDX[n]&&!v.includes(n))v.push(n);return v.slice(0,max)}
+ for(const e of NMAP){let sc=0,ok=true;const used=new Set();
+  for(const t of qt){let f=-1;for(let i=0;i<e.t.length;i++)if(!used.has(i)&&e.t[i].startsWith(t)){f=i;break}
+   if(f<0){for(let i=0;i<e.t.length;i++)if(!used.has(i)&&t.length>=3&&e.t[i].includes(t)){f=i;sc-=1.2;break}}   // parte interna della parola: meno rilevante
+   if(f<0){ok=false;break}used.add(f);sc+=(e.t[f]===t?3:2)-f*.1}
+  if(!ok)continue;if(e.t[0].startsWith(qt[0]))sc+=1;sc-=e.t.length*.05;if(FS.includes(e.n))sc+=1.5;if(REC.includes(e.n))sc+=1;sc+=Math.min((IDX[e.n]||[]).length,15)*.1;out.push([sc,e.n])}   // a parita' escono prima le fermate piu' servite
+ return out.sort((a,b)=>b[0]-a[0]).slice(0,max).map(x=>x[1])}
+function suggHtml(v){const l=suggerisci(v,6);if(!l.length)return v.trim()?'<div class="sgv">Nessuna fermata con questo nome</div>':"";
+ const t=norm(v).split(" ").filter(Boolean),re=t.length?new RegExp("("+t.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")).join("|")+")","ig"):null;
+ return (v.trim()?"":'<div class="sgh">Preferite e recenti</div>')+l.map(n=>`<button type="button" class="sg" data-sg="${esc(n)}"><span>${re?esc(n).replace(re,"<b>$1</b>"):esc(n)}</span><small>${IDX[n]?IDX[n].length:0} linee</small></button>`).join("")}
+let SGCB=null,QF="",QDA="",QA="",ABF="da";
 function prepara(){IDX={};ATT.forEach(l=>l.f.forEach((st,i)=>(IDX[st[0]]=IDX[st[0]]||[]).push([l,st[1],i])));
- nomi=Object.keys(IDX).sort();lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
+ nomi=Object.keys(IDX).sort();NMAP=nomi.map(n=>({n,t:norm(n).split(" ")}));lista=`<datalist id="fermate">${nomi.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 let tab="",USER=null,drawId=0;const RC={};
 const TIT={osm:"Fermata",fermata:"Cerca fermata",linea:"Cerca linea",ab:"Da A a B",vicino:"Vicino a te",imp:"Impostazioni",stop:"",orari:""};
 let PREF=[],LEGG=false;try{PREF=JSON.parse(localStorage.getItem("pref")||"[]");LEGG=localStorage.getItem("legg")==="1"}catch(e){}
@@ -242,11 +271,15 @@ function righe(n,max,win){const base=dalle();
  const card=([l,p,i])=>dep(l,p.map(x=>x[0]),undefined,undefined,null,false,ATT.indexOf(l)+","+i);
  return (max?r.slice(0,max):r).map(card).join("")+(max&&r.length>max?`<p class="hint">+${r.length-max} altre linee</p>`:"")+(r.every(x=>!x[1].length)?`<p class="hint">Nessuna partenza dopo le ${esc($("#ora").value)} con questo tipo di orario (cambialo in Profilo).</p>`:"")}
 function vFermata(){
- $("#vista").innerHTML=`<input id="q" list="fermate" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off">${lista}<div id="r"></div>`;
- const go=()=>{const q=$("#q").value;if(q.trim().length<2){$("#r").innerHTML="";return}
-  const nm=nomi.filter(n=>has(n,q)).sort((a,b)=>a.length-b.length).slice(0,8);
+ $("#vista").innerHTML=`<input id="q" type="text" placeholder="Nome della fermata (es. Piazza Roma)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" value="${esc(QF)}"><div id="sug"></div><div id="r"></div>`;
+ const q=$("#q"),go=()=>{const t=q.value;if(t.trim().length<2){$("#r").innerHTML="";return}
+  const nm=nomi.includes(t)?[t]:nomi.filter(n=>has(n,t)).sort((a,b)=>a.length-b.length).slice(0,8);
   $("#r").innerHTML=nm.map(n=>`<div class="card"><h3>${esc(n)} ${stella(n)}</h3>${righe(n,0,60)}</div>`).join("")||'<p class="mute">Nessuna fermata trovata.</p>'};
- $("#q").oninput=go;go()}
+ const sug=()=>{$("#sug").innerHTML=suggHtml(q.value)};
+ SGCB=n=>{q.value=n;QF=n;ricorda(n);$("#sug").innerHTML="";q.blur();go()};
+ q.oninput=()=>{QF=q.value;sug();$("#r").innerHTML=""};q.onfocus=sug;
+ q.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();const l=suggerisci(q.value,1);if(l[0])SGCB(l[0]);else q.blur()}};
+ if(QF)go()}
 const listaOrari=(l,i,base)=>{const ts=l.f[i][1].map((t,k)=>[t,k]).filter(x=>x[0]),nx=ts.find(x=>mins(x[0])>=base);
  const riga=([t,k],p)=>{let t1=null;for(let q=l.f.length-1;q>i;q--){const v=l.f[q][1][k];if(v){t1=v;break}}
   let d=t1?mins(t1)-mins(t):0;if(d<0)d+=1440;
@@ -268,7 +301,7 @@ function vLinea(){
   attivaPassate()};
  $("#sf").innerHTML=l.f.map((s,i)=>`<option value="${i}">${esc(s[0])}</option>`).join("");$("#sf").onchange=show;show()}
 function vAB(){
- $("#vista").innerHTML=`<input id="da" list="fermate" placeholder="Partenza" autocomplete="off"><label for="a"></label><input id="a" list="fermate" placeholder="Arrivo" autocomplete="off">${lista}<p class="hint">Solo bus diretti, senza cambi.</p><div id="r"></div>`;
+ $("#vista").innerHTML=`<input id="da" type="text" placeholder="Partenza" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" value="${esc(QDA)}"><input id="a" type="text" placeholder="Arrivo" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" value="${esc(QA)}" style="margin-top:8px"><div id="sug"></div><p class="hint">Solo bus diretti, senza cambi.</p><div id="r"></div>`;
  const go=()=>{const A=$("#da").value,B=$("#a").value;if(A.trim().length<2||B.trim().length<2){$("#r").innerHTML="";return}
   let h="",primo=null;ATT.forEach(l=>{const i=l.f.findIndex(s=>has(s[0],A));if(i<0)return;const j=l.f.findIndex((s,k)=>k>i&&has(s[0],B));if(j<0)return;
    const tr=l.f[i][1].map((t,k)=>[t,l.f[j][1][k],k]).filter(([p,r])=>p&&r&&mins(p)>=dalle()).slice(0,4);
@@ -277,7 +310,11 @@ function vAB(){
    h+=`<div class="card">${dep(l,tr.map(x=>x[0]),sub,i+","+j,tr.length?tr[0][2]:null,true)}</div>`});
   $("#r").innerHTML=h||'<p class="mute">Nessun bus diretto trovato.</p>';
   if(primo){mapLine=String(primo[0]);SEG=[primo[1],primo[2]];TRIP=primo[4];SELBUS=false;drawMap()}};
- $("#da").oninput=go;$("#a").oninput=go;go()}
+ const sug=()=>{$("#sug").innerHTML=suggHtml($("#"+ABF).value)};
+ SGCB=n=>{$("#"+ABF).value=n;ricorda(n);if(ABF==="da"){QDA=n;if(!$("#a").value.trim()){ABF="a";$("#a").focus();sug();return}}else QA=n;$("#sug").innerHTML="";if(document.activeElement)document.activeElement.blur();go()};
+ for(const id of ["da","a"]){const e=$("#"+id);e.onfocus=()=>{ABF=id;sug()};e.oninput=()=>{if(id==="da")QDA=e.value;else QA=e.value;ABF=id;sug();$("#r").innerHTML=""};
+  e.onkeydown=ev=>{if(ev.key==="Enter"){ev.preventDefault();const l=suggerisci(e.value,1);if(l[0])SGCB(l[0]);else e.blur()}}}
+ go()}
 function vVicino(){
  $("#vista").innerHTML='<p class="mute" id="r">Cerco la tua posizione…</p>';
  const err=t=>{$("#r").textContent=t};
@@ -321,6 +358,7 @@ function render(){
  if(!tab){ULTIMO="";return}
  const chiave=tab+"|"+STOP+"|"+(OR?OR.l+"-"+OR.i:"")+"|"+(STOPO?STOPO.i:"");if(chiave!==ULTIMO){$("#sheet").scrollTop=0;ULTIMO=chiave}
  $("#fav").hidden=tab!=="stop";if(tab==="stop")$("#fav").textContent=isFS(STOP)?"★":"☆";
+ $("#orab").hidden=tab==="imp";
  $("#stit").textContent=tab==="stop"?STOP:tab==="orari"?"Linea "+ATT[OR.l].id:tab==="osm"?(STOPO.nm||"Fermata"):TIT[tab];$("#imp").hidden=tab!=="imp";$("#vista").hidden=tab==="imp";
  if(tab==="imp"){vImpPrefs();aggiornaDiagBus();return}
  ({fermata:vFermata,linea:vLinea,ab:vAB,vicino:vVicino,stop:vStop,orari:vOrari,osm:vOsm})[tab]()}
@@ -695,6 +733,13 @@ document.addEventListener("click",e=>{
  if(b){mapLine=b.dataset.map;SEG=b.dataset.seg?b.dataset.seg.split(",").map(Number):null;TRIP=b.dataset.k!=null&&b.dataset.k!==""?+b.dataset.k:null;SELBUS=false;tab="";render();drawMap()}});
 document.querySelectorAll("#bar button").forEach(b=>b.onclick=()=>{tab=b.dataset.k===tab?"":b.dataset.k;render()});
 $("#fav").onclick=()=>{toggleFS(STOP);render()};
+(function(){let DT=null;const sheet=$("#sheet"),testo=el=>el&&el.matches&&el.matches("#sheet input[type=text]");
+ document.addEventListener("focusin",e=>{if(testo(e.target)){clearTimeout(DT);sheet.classList.add("tp")}});
+ document.addEventListener("focusout",()=>{DT=setTimeout(()=>{if(!testo(document.activeElement))sheet.classList.remove("tp")},150)});
+ if(window.visualViewport){const f=()=>document.documentElement.style.setProperty("--vvh",visualViewport.height+"px");visualViewport.addEventListener("resize",f);f()}
+ // toccare un suggerimento non deve chiudere la tastiera prima di scegliere
+ const sgTap=e=>{const b=e.target.closest&&e.target.closest("[data-sg]");if(b){e.preventDefault();SGCB&&SGCB(b.dataset.sg)}};
+ document.addEventListener("mousedown",sgTap);document.addEventListener("touchstart",sgTap,{passive:false})})();
 $("#chiudi").onclick=()=>{tab="";render()};
 $("#ora").addEventListener("input",()=>{oraManuale=true});
 $("#ora").onchange=vista;
@@ -721,7 +766,7 @@ async function carica(){
   const n=new Date();
   $("#nota").innerHTML="Orari di tabella aggiornati il "+esc(GEN)+". Non in tempo reale. <a href=\"report.txt\">Stato dati</a>"}
  const tipi=[...new Set(DATA.linee.map(l=>l.tipo))];
- $("#per").innerHTML=tipi.map(t=>`<option>${esc(t)}</option>`).join("");$("#per").value=indovina(tipi);$("#per").onchange=applica;
+ $("#per").innerHTML=tipi.map(t=>`<option value="${esc(t)}">${esc(t.replace("invernale","inverno").replace("estivo","estate").replace(" (scuole aperte)","").replace(" (vacanze)"," · vacanze"))}</option>`).join("");$("#per").value=indovina(tipi);$("#per").onchange=applica;
  $("#ok").onclick=()=>$("#pop").close();
  applica();popup();caricaPercorsi().then(()=>{if(PRONTA)drawMap()});caricaOSM()}
 carica();

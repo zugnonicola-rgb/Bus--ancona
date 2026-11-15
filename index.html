@@ -169,6 +169,10 @@ label.chk input:checked{background:#34c759}label.chk input:checked::after{transf
 .sg{display:flex;justify-content:space-between;align-items:center;width:100%;border:0;border-top:.5px solid var(--sep);background:none;padding:12px 14px;font:inherit;font-size:16px;color:var(--ink);text-align:left}
 .sg:first-child{border-top:0}.sg small{color:var(--mute);font-size:13px;margin-left:10px;white-space:nowrap}
 .sgh,.sgv{padding:10px 14px;color:var(--mute);font-size:13px}
+.tagx{font-size:11px;font-weight:600;color:var(--mute);background:rgba(120,120,128,.18);border-radius:8px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+.best{font-size:11px;font-weight:700;color:#fff;background:#34c759;border-radius:8px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+.best.b2{background:var(--acc)}
+.opz .chips{margin:6px 0 0}.opz .chip{padding:5px 10px;font-size:14px}
 </style>
 </head>
 <body>
@@ -263,7 +267,7 @@ const traPill=t=>{if(oraManuale)return"";const m=Math.round(mins(t)-adessoMin())
 function dep(l,tt,sub,seg,k,vis,open){
  const w=DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*"));
  const at=open?`data-open="${open}"`:`data-map="${ATT.indexOf(l)}"${seg?` data-seg="${seg}"`:""}${k!=null?` data-k="${k}"`:""}`;
- return `<div class="row" ${at}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${isPref(l)?'<span class="star">★</span> ':""}${esc(fine(l))}${w?' <span class="warnico">⚠</span>':""}</div>${vis&&sub?`<div class="sub">${sub}</div>`:""}</div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b>${traPill(tt[0])}</div>`:'<div class="next mute">—</div>'}<button class="chev" aria-label="Dettagli">⌄</button></div><div class="det" hidden><div class="mute">da ${esc(inizio(l))}${!vis&&sub?" · "+sub:""}</div>${tt.length>1?`<div class="alt">Poi: ${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div></div>`}
+ return `<div class="row" ${at}><div class="dep">${badge(l)}<div class="mid"><div class="dest">${isPref(l)?'<span class="star">★</span> ':""}${esc(fine(l))}${l.ambito==="extraurbano"?'<span class="tagx">extraurbana</span>':""}${w?' <span class="warnico">⚠</span>':""}</div>${vis&&sub?`<div class="sub">${sub}</div>`:""}</div>${tt.length?`<div class="next"><b>${hm(tt[0])}</b>${traPill(tt[0])}</div>`:'<div class="next mute">—</div>'}<button class="chev" aria-label="Dettagli">⌄</button></div><div class="det" hidden><div class="mute">da ${esc(inizio(l))}${!vis&&sub?" · "+sub:""}</div>${tt.length>1?`<div class="alt">Poi: ${tt.slice(1).map(hm).join(" · ")}</div>`:""}${warn(l)}</div></div>`}
 function righe(n,max,win){const base=dalle();
  let r=(IDX[n]||[]).map(([l,t,i])=>[l,t.map((x,k)=>[x,k]).filter(([x])=>x&&mins(x)>=base&&(!win||mins(x)<=base+win)).slice(0,win?10:4),i]);
  if(win){r=r.filter(x=>x[1].length);if(!r.length)return `<p class="hint">Nessun bus nell'ora successiva alle ${esc($("#ora").value)}. Ecco i prossimi:</p>`+righe(n,max)}
@@ -310,25 +314,36 @@ function snapLinea(g,pts){let best=null;const P=g.P,c=g.cum;
    t=L2?Math.max(0,Math.min(1,-(ax*dx+ay*dy)/L2)):0,d=Math.hypot(ax+t*dx,ay+t*dy);if(d<=45&&(!best||d<best.d))best={d,m:c[i-1]+t*Math.sqrt(L2)}}}
  return best}
 // tutte le corse dirette da A a B, in ordine di partenza: dagli orari ufficiali e, dove mancano le fermate, stimate dal tracciato
-function opzioniAB(A,B){const base=dalle(),gA=gruppo(A),gB=gruppo(B),out=[];
+function opzioniAB(A,B){const base=dalle(),gA=gruppo(A),gB=gruppo(B),uff=[],stim=[];
  ATT.forEach((l,li)=>{const visti=new Set();let iA=-1,jB=-1;
   for(let q=0;q<l.f.length;q++)if(gA.nomi.has(l.f[q][0])){iA=q;break}
   if(iA>=0)for(let q=iA+1;q<l.f.length;q++)if(gB.nomi.has(l.f[q][0])){jB=q;break}
-  if(iA>=0&&jB>=0){const ta=l.f[iA][1],tb=l.f[jB][1];ta.forEach((p,k)=>{const r=tb[k];if(p&&r&&mins(p)>=base){const dp=mins(p);let ar=mins(r);if(ar<dp)ar+=1440;out.push({l,li,k,dep:dp,arr:ar,i:iA,j:jB,est:false});visti.add(k)}})}
-  const g=geo(l);if(g&&gA.pts.length&&gB.pts.length){const a=snapLinea(g,gA.pts),b=snapLinea(g,gB.pts);
+  if(iA>=0&&jB>=0){const ta=l.f[iA][1],tb=l.f[jB][1];ta.forEach((p,k)=>{const r=tb[k];if(p&&r&&mins(p)>=base){const dp=mins(p);let ar=mins(r);if(ar<dp)ar+=1440;
+    if(ar-dp>=1&&ar-dp<=120){uff.push({l,li,k,dep:dp,arr:ar,i:iA,j:jB,est:false});visti.add(k)}}})}
+  // stima dal tracciato: SOLO linee urbane e solo se le fermate cadono in un tratto breve tra due punti orario (altrimenti non e' affidabile)
+  const g=l.ambito==="extraurbano"?null:geo(l);if(g&&gA.pts.length&&gB.pts.length){const a=snapLinea(g,gA.pts),b=snapLinea(g,gB.pts);
    if(a&&b&&b.m-a.m>120){let i0=0,j0=l.f.length-1;for(let q=0;q<g.sp.length;q++)if(g.sp[q]<=a.m+5)i0=q;for(let q=g.sp.length-1;q>=0;q--)if(g.sp[q]>=b.m-5)j0=q;
-    for(const tr of trips(l)){if(visti.has(tr.k))continue;const ta=timeAtM(tr,a.m),tb=timeAtM(tr,b.m);if(ta==null||tb==null||ta<base)continue;out.push({l,li,k:tr.k,dep:ta,arr:tb,i:i0,j:Math.max(i0,j0),est:true})}}}});
- out.sort((x,y)=>x.dep-y.dep||x.arr-y.arr);return out}
-const rigaOpz=(o,veloce)=>{const l=o.l,w=DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*")),d=Math.round(o.arr-o.dep);
- return `<div class="row" data-map="${o.li}" data-seg="${o.i},${o.j}" data-k="${o.k}" data-est="${Math.round(o.dep)},${Math.round(o.arr)}"><div class="dep">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}${w?' <span class="warnico">⚠</span>':""}</div><div class="sub">arriva ${hm(fmtT(o.arr))} · ${d} min${o.est?" · stimato":""}${veloce?" · <b>più veloce</b>":""}</div></div><div class="next"><b>${hm(fmtT(o.dep))}</b>${traPill(fmtT(o.dep))}</div></div></div>`};
+    for(const tr of trips(l)){if(visti.has(tr.k))continue;const ia=infoM(tr,a.m),ib=infoM(tr,b.m);if(!ia||!ib||ia.t<base)continue;
+     if(ia.len>1500||ia.dt>8||ib.len>1500||ib.dt>8||ib.t-ia.t<1||ib.t-ia.t>120)continue;
+     stim.push({l,li,k:tr.k,dep:ia.t,arr:ib.t,i:i0,j:Math.max(i0,j0),est:true})}}}});
+ return {uff,stim}}
+// una scheda per linea (con le sue prossime partenze), la linea che parte per prima in cima
+function gruppiAB(op){const mp=new Map();for(const o of op.sort((x,y)=>x.dep-y.dep||x.arr-y.arr)){(mp.get(o.li)||mp.set(o.li,[]).get(o.li)).push(o)}
+ return [...mp.values()].map(a=>({l:a[0].l,li:a[0].li,t:a.slice(0,4)})).sort((x,y)=>x.t[0].dep-y.t[0].dep||x.t[0].arr-y.t[0].arr).slice(0,8)}
+const attrOpz=o=>`data-map="${o.li}" data-seg="${o.i},${o.j}" data-k="${o.k}" data-est="${Math.round(o.dep)},${Math.round(o.arr)}"`;
+function schedaOpz(g,primaPart,primaArr){const l=g.l,o=g.t[0],w=DATA.avvisi.some(x=>x.linee.includes(l.id)||x.linee.includes("*")),d=Math.round(o.arr-o.dep);
+ return `<div class="row opz" ${attrOpz(o)}><div class="dep">${badge(l)}<div class="mid"><div class="dest">verso ${esc(fine(l))}${l.ambito==="extraurbano"?'<span class="tagx">extraurbana</span>':""}${w?' <span class="warnico">⚠</span>':""}${primaPart?'<span class="best">parte per prima</span>':""}${primaArr?'<span class="best b2">arriva prima</span>':""}</div><div class="sub">arriva ${hm(fmtT(o.arr))} · ${d} min${o.est?" · stimato":""}</div></div><div class="next"><b>${hm(fmtT(o.dep))}</b>${traPill(fmtT(o.dep))}</div></div>
+  ${g.t.length>1?`<div class="chips">${g.t.slice(1).map(x=>`<button type="button" class="chip" ${attrOpz(x)}>${hm(fmtT(x.dep))}<small style="font-weight:500;opacity:.7"> → ${hm(fmtT(x.arr))}</small></button>`).join("")}</div>`:""}</div>`}
 function vAB(){
  $("#vista").innerHTML=`<input id="da" type="text" placeholder="Partenza" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next" value="${esc(QDA)}"><input id="a" type="text" placeholder="Arrivo" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search" value="${esc(QA)}" style="margin-top:8px"><div id="sug"></div><p class="hint">Solo bus diretti, senza cambi. Gli orari "stimati" sono calcolati lungo il tracciato.</p><div id="r"></div>`;
  const go=()=>{const A0=$("#da").value,B0=$("#a").value;if(A0.trim().length<2||B0.trim().length<2){$("#r").innerHTML="";return}
-  const A=risolvi(A0),B=risolvi(B0),op=opzioniAB(A,B).slice(0,10);
-  if(!op.length){$("#r").innerHTML='<p class="mute">Nessun bus diretto da questo orario in poi. Prova a spostare l\'orario in alto.</p>';return}
-  const vel=Math.min(...op.map(o=>o.arr-o.dep));
-  $("#r").innerHTML=op.map(o=>rigaOpz(o,op.length>2&&(o.arr-o.dep)===vel)).join("");
-  const o=op[0];mapLine=String(o.li);SEG=[o.i,o.j];TRIP=o.k;EST=[Math.round(o.dep),Math.round(o.arr)];SELBUS=false;drawMap()};
+  const A=risolvi(A0),B=risolvi(B0),{uff,stim}=opzioniAB(A,B),G=gruppiAB(uff),GS=gruppiAB(stim);
+  if(!G.length&&!GS.length){$("#r").innerHTML='<p class="mute">Nessun bus diretto da questo orario in poi. Prova a spostare l\'orario in alto.</p>';return}
+  const pA=G.length?Math.min(...G.map(x=>x.t[0].dep)):0,pR=G.length?Math.min(...G.map(x=>x.t[0].arr)):0;
+  let h=G.length?G.map(x=>schedaOpz(x,G.length>1&&x.t[0].dep===pA,G.length>1&&x.t[0].arr===pR)).join(""):'<p class="mute">Nessuna corsa dagli orari ufficiali. Vedi sotto le corse stimate.</p>';
+  if(GS.length)h+=`<button class="btn" id="mostraStime" type="button">Mostra ${GS.length} ${GS.length>1?"linee":"linea"} con orario stimato</button><div id="listaStime" hidden><p class="hint">Queste corse non sono negli orari ufficiali: l'orario e' calcolato tra le fermate principali e puo' sbagliare di qualche minuto.</p>${GS.map(x=>schedaOpz(x,false,false)).join("")}</div>`;
+  $("#r").innerHTML=h;const ms=$("#mostraStime");if(ms)ms.onclick=()=>{const L=$("#listaStime");L.hidden=!L.hidden;ms.textContent=L.hidden?`Mostra ${GS.length} ${GS.length>1?"linee":"linea"} con orario stimato`:"Nascondi le corse stimate"};
+  const o=(G.length?G[0]:GS[0]).t[0];mapLine=String(o.li);SEG=[o.i,o.j];TRIP=o.k;EST=[Math.round(o.dep),Math.round(o.arr)];SELBUS=false;drawMap()};
  const sug=()=>{$("#sug").innerHTML=suggHtml($("#"+ABF).value)};
  SGCB=n=>{$("#"+ABF).value=n;ricorda(n);if(ABF==="da"){QDA=n;if(!$("#a").value.trim()){ABF="a";$("#a").focus();sug();return}}else QA=n;$("#sug").innerHTML="";if(document.activeElement)document.activeElement.blur();go()};
  for(const id of ["da","a"]){const e=$("#"+id);e.onfocus=()=>{ABF=id;sug()};e.oninput=()=>{if(id==="da")QDA=e.value;else QA=e.value;ABF=id;sug();$("#r").innerHTML=""};
@@ -698,6 +713,8 @@ function lineePassanti(lo,la){const out=[],kx=111320*Math.cos(la*Math.PI/180),ky
    if(d<=30&&(!best||d<best.d)){const L=Math.sqrt(L2)||1;best={d,m:c[i-1]+t*L,lat:-(dx*(-ay)-dy*(-ax))/L}}}   // lat>0: la fermata sta a destra del senso di marcia
   if(best&&best.lat>=-4)out.push({l,li,m:best.m})});
  return out}
+function infoM(tr,m){const P=tr.pts;if(m<P[0][0]-5||m>P[P.length-1][0]+5)return null;let i=1;while(i<P.length-1&&P[i][0]<m)i++;
+ const [p0,a]=P[i-1],[p1,b]=P[i];return {t:a+(b-a)*Math.min(1,Math.max(0,p1>p0?(m-p0)/(p1-p0):0)),len:p1-p0,dt:b-a}}
 function timeAtM(tr,m){const P=tr.pts;if(m<P[0][0]-5||m>P[P.length-1][0]+5)return null;let i=1;while(i<P.length-1&&P[i][0]<m)i++;
  const [p0,a]=P[i-1],[p1,b]=P[i];return a+(b-a)*Math.min(1,Math.max(0,p1>p0?(m-p0)/(p1-p0):0))}
 const fmtT=t=>{const x=Math.round(t)%1440;return String(Math.floor(x/60)).padStart(2,"0")+"."+String(x%60).padStart(2,"0")};
